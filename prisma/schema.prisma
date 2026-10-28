@@ -1,0 +1,112 @@
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model GuildConfig {
+  guildId               String   @id
+  verificationChannelId String?
+  verifiedRoleId        String?
+  minAccountAgeDays     Int      @default(7)
+  ticketCategoryId      String?
+  ticketLogChannelId    String?
+  staffRoleIds          String[] @default([])
+  applicationRoleId     String?
+  modLogChannelId       String?
+  serverLogChannelId    String?
+  ticketCounter         Int      @default(0)
+  caseCounter           Int      @default(0)
+  updatedAt             DateTime @updatedAt
+}
+
+/// Latest time each member accepted the rules.
+model Verification {
+  guildId    String
+  userId     String
+  verifiedAt DateTime @default(now())
+
+  @@id([guildId, userId])
+}
+
+enum TicketType {
+  SUPPORT
+  BUG_REPORT
+  APPLICATION
+}
+
+enum TicketStatus {
+  OPEN
+  CLOSED
+}
+
+enum ApplicationStatus {
+  PENDING
+  ACCEPTED
+  DENIED
+}
+
+model Ticket {
+  id           Int                @id @default(autoincrement())
+  guildId      String
+  /// Per-guild number shown to users ("support-0042").
+  number       Int
+  type         TicketType
+  status       TicketStatus       @default(OPEN)
+  openerId     String
+  /// Null only while the channel is being created.
+  channelId    String?            @unique
+  /// Modal answers as [{ label, value }].
+  answers      Json
+  /// "guild:user:type" while open, null once closed. Its unique index enforces one open ticket per user per type.
+  openKey      String?            @unique
+  claimedById  String?
+  closedById   String?
+  closeReason  String?
+  appStatus    ApplicationStatus?
+  reviewedById String?
+  reviewReason String?
+  reviewedAt   DateTime?
+  createdAt    DateTime           @default(now())
+  closedAt     DateTime?
+
+  @@unique([guildId, number])
+}
+
+enum CaseAction {
+  WARN
+  TIMEOUT
+  UNTIMEOUT
+  KICK
+  BAN
+  UNBAN
+  PURGE
+}
+
+model ModCase {
+  id           Int        @id @default(autoincrement())
+  guildId      String
+  /// Per-guild number shown to users ("Case #17").
+  number       Int
+  action       CaseAction
+  /// Null only for a purge without a user filter.
+  targetId     String?
+  moderatorId  String
+  reason       String?
+  durationSec  Int?
+  /// Purge only.
+  channelId    String?
+  messageCount Int?
+  /// Set when /clearwarn removes a warning; the case itself is kept for history.
+  clearedById  String?
+  clearedAt    DateTime?
+  createdAt    DateTime   @default(now())
+
+  @@unique([guildId, number])
+  @@index([guildId, targetId])
+}
