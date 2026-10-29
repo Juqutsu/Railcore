@@ -3,6 +3,7 @@ import { defineEvent } from '../handlers.js';
 import { getConfig } from '../services/guildConfig.js';
 import { sendLog } from '../services/logs.js';
 import { sendWelcome } from '../services/welcome.js';
+import { syncNewMember } from '../services/xpRoleSync.js';
 import { t } from '../text.js';
 import { embeds, userLine } from '../utils/embeds.js';
 
@@ -30,6 +31,7 @@ export default defineEvent({
     await Promise.all([
       sendLog(member.guild, 'serverLogChannelId', { embeds: [embed] }),
       sendWelcome(member),
+      syncNewMember(member),
     ]);
   },
 });

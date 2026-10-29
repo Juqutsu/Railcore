@@ -7,7 +7,8 @@ type LogChannel =
   | 'serverLogChannelId'
   | 'ticketLogChannelId'
   | 'welcomeChannelId'
-  | 'leaveChannelId';
+  | 'leaveChannelId'
+  | 'rankUpChannelId';
 
 /**
  * Posts to a configured log (or welcome/leave) channel and reports whether it arrived.

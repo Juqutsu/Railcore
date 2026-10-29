@@ -31,6 +31,7 @@ Verification, welcome messages, tickets, staff applications, moderation and logs
 | 🛡️  | **Moderation**         | Warn, timeout, kick, ban and purge. Every action becomes a numbered case with a mod-log entry. Actions on members also DM them and check the role hierarchy.                                                                                                                           |
 | 🖱️  | **Right-click menu**   | Warn, Timeout and Show warnings on a member. Report message on any message, which opens a private report ticket with a copy of it.                                                                                                                                                     |
 | 🚆  | **Game stats**         | `/stats` shows a member's XP, points, trips, kilometres and stops from the Roblox game, found through their Bloxlink link. `/leaderboard` shows the top 100 by XP or distance, 10 per page, with buttons to page through and switch boards. Read-only: the bot never writes game data. |
+| 🎖️  | **XP roles**           | Stackable Discord roles for in-game XP thresholds you set in `/setup`, kept in sync automatically, with rank-up announcements and the rank on the `/stats` card.                                                                                                                       |
 | 📜  | **Server log**         | Message edits and deletions, bulk deletes, joins, leaves, role changes and nickname changes.                                                                                                                                                                                           |
 | ⚙️  | **`/setup` dashboard** | Every channel, role, number and text is set in Discord. The dashboard warns when the bot lacks permissions. No IDs live in the code.                                                                                                                                                   |
 
@@ -97,18 +98,18 @@ npm run dev              # starts the bot and restarts it when you save a file
 
 ### Environment variables
 
-| Variable            | Needed for     | What it is                                                                                               |
-| ------------------- | -------------- | -------------------------------------------------------------------------------------------------------- |
-| `DISCORD_BOT_TOKEN` | always         | The bot token from the Developer Portal.                                                                 |
-| `TEST_SERVER_ID`    | `commands:dev` | ID of your test server (enable Developer Mode in Discord, then right-click the server → Copy Server ID). |
-| `DATABASE_URL`      | local dev      | Postgres connection URL. In Docker it is built from the `POSTGRES_*` values and this line is ignored.    |
-| `POSTGRES_USER`     | Docker         | Database user. Default `railcore`.                                                                       |
-| `POSTGRES_PASSWORD` | Docker         | Database password. Use letters and digits only, because it becomes part of a URL. **Change it.**         |
-| `POSTGRES_DB`       | Docker         | Database name. Default `railcore`.                                                                       |
-| `ROBLOX_API_KEY`    | `/stats`       | Roblox Open Cloud key with read access to the game's data stores (see [Game stats](#-game-stats)).       |
-| `BLOXLINK_API_KEY`  | `/stats`       | Bloxlink server API key, used to find a member's linked Roblox account.                                  |
-| `LOG_LEVEL`         | optional       | `fatal`, `error`, `warn`, `info` (default), `debug` or `trace`.                                          |
-| `NODE_ENV`          | set by Docker  | `production` switches logs to JSON. Leave it unset locally for readable, colored logs.                   |
+| Variable            | Needed for         | What it is                                                                                               |
+| ------------------- | ------------------ | -------------------------------------------------------------------------------------------------------- |
+| `DISCORD_BOT_TOKEN` | always             | The bot token from the Developer Portal.                                                                 |
+| `TEST_SERVER_ID`    | `commands:dev`     | ID of your test server (enable Developer Mode in Discord, then right-click the server → Copy Server ID). |
+| `DATABASE_URL`      | local dev          | Postgres connection URL. In Docker it is built from the `POSTGRES_*` values and this line is ignored.    |
+| `POSTGRES_USER`     | Docker             | Database user. Default `railcore`.                                                                       |
+| `POSTGRES_PASSWORD` | Docker             | Database password. Use letters and digits only, because it becomes part of a URL. **Change it.**         |
+| `POSTGRES_DB`       | Docker             | Database name. Default `railcore`.                                                                       |
+| `ROBLOX_API_KEY`    | game features      | Roblox Open Cloud key with read access to the game's data stores (see [Game stats](#-game-stats)).       |
+| `BLOXLINK_API_KEY`  | `/stats`, XP roles | Bloxlink server API key, used to find a member's linked Roblox account.                                  |
+| `LOG_LEVEL`         | optional           | `fatal`, `error`, `warn`, `info` (default), `debug` or `trace`.                                          |
+| `NODE_ENV`          | set by Docker      | `production` switches logs to JSON. Leave it unset locally for readable, colored logs.                   |
 
 ### Register the slash commands
 
@@ -129,6 +130,7 @@ If commands are registered both on the test server and globally, they show up tw
    - **Welcome & leave**: the welcome and leave channels (not set = no message) and their texts. Texts can use `{user}` (mention), `{name}` (display name), `{server}` and `{count}` (member count). **Use default** goes back to the built-in text. Only the new member is pinged, even if the text contains `@everyone`. Bots get no messages.
    - **Tickets & applications**: ticket category, ticket log channel, staff roles, the application role that accepted applicants get, and the reminder and auto-close times. When staff wrote last and the opener stays quiet, the opener is reminded after the reminder time, and the ticket closes once the auto-close time has passed after that (default 24 + 24 hours). A reminder time of `0` turns both off; an auto-close time of `0` keeps only the reminder.
    - **Logs**: mod log channel and server log channel.
+   - **Game**: the rank-up channel and the **XP roles** (see [XP roles](#xp-roles)).
 
    The dashboard warns you when the bot is missing permissions in a channel you pick.
 
@@ -150,6 +152,17 @@ Good to know:
 - The leaderboards are written at most once a minute per player and cached for a minute. Studio test profiles (negative user IDs) never appear.
 - A player who never played shows a "hasn't played yet" card. Missing or broken values count as 0, the same way the game treats them.
 - The bot only reads. It never writes to the game's data stores.
+
+### XP roles
+
+Members get Discord roles for their in-game XP, for example Trainee from 25 XP and Driver from 150 XP. Roles **stack**: someone with 200 XP has both. Set them up in **`/setup` → XP roles**: **Add or change** picks a role and its XP, the menu above removes one, and **Sync everyone now** checks every member at once.
+
+- **Keeping them right**: every member has exactly the XP roles their XP reaches. The bot adds missing ones and removes ones that no longer fit, for example after you raise a threshold or someone unlinks their Roblox account. Roles that aren't XP roles are never touched. Removing an XP role from the list leaves it on members; the bot just stops managing it.
+- **When it updates**: every 10 minutes for members the bot already knows, right away on `/stats` and when someone joins, and once a day (or with **Sync everyone now**) for all members through Bloxlink, which finds new links and unlinks. The daily pass asks Bloxlink one member per second.
+- **Rank-ups**: set a **Rank-up channel** in `/setup` → Game, and the bot announces "🎉 @member is now @Driver!" when someone reaches a new role by playing. Setting up roles or changing thresholds announces nothing.
+- **On `/stats`**: the card shows the member's rank and the XP to the next one.
+- **Which roles qualify**: the bot's role must be above every XP role, and you can only add roles below your own highest role (you also need **Manage Roles**, except the owner), the same rule as handing out a role by hand. Roles with staff permissions such as Administrator, Manage Server, Manage Roles or Ban Members can't be XP roles. If an XP role later gains such a permission, is dragged above the bot's role, or is deleted, the bot stops giving or taking it until you fix or remove it.
+- **Members in Membership Screening** get no XP roles until they have accepted the rules, so roles never let them skip screening.
 
 ## 🐳 Deploy with Docker
 
@@ -238,9 +251,9 @@ src/
 ├─ commands/           Slash and right-click commands, one file each (admin/, context/, verification/, tickets/, moderation/, game/)
 ├─ events/             Discord events (interactions, welcome and server log, ready)
 ├─ interactions/       Buttons, select menus and modals (buttons/, selects/, modals/)
-├─ services/           Feature logic: setup, verification, welcome, game stats (roblox), tickets, applications, transcripts, moderation, logs
+├─ services/           Feature logic: setup, verification, welcome, game stats (roblox), XP roles, tickets, applications, transcripts, moderation, logs
 ├─ database/           Prisma client
-├─ utils/              Embeds, errors, permissions, durations, cooldowns, templates, game progress, logger
+├─ utils/              Embeds, errors, permissions, durations, cooldowns, templates, game progress, XP tiers, logger
 └─ scripts/            deploy-commands.ts, dev-db.ts
 prisma/
 ├─ schema.prisma       Database schema
@@ -271,6 +284,7 @@ prisma/
 
 ## 📌 Known limitations
 
+- **XP role sync speed**: the daily Bloxlink pass checks one member per second, so a server with 3,000 members needs about 50 minutes. Members who link their account in between are picked up on `/stats` or by that pass.
 - **Single bot process**: the settings cache and the ticket-close lock live in memory. Don't run two copies of the bot against the same database.
 - **Server log content**: Discord only sends a message's old text if the bot had it cached. The cache covers messages sent since the last start, up to the last 200 per channel. Edits of older messages show the old text as "Unknown", and deletions of older messages aren't logged.
 - **No "changed by" in the server log**: role and nickname changes don't say who made them. That would need audit-log lookups.

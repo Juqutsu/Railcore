@@ -50,7 +50,11 @@ export const SETTINGS: Record<SettingKey, Setting> = {
   applicationRoleId: { kind: 'role' },
   modLogChannelId: { kind: 'channel', permissions: POST },
   serverLogChannelId: { kind: 'channel', permissions: POST },
+  rankUpChannelId: { kind: 'channel', permissions: POST },
 };
+
+/** The dashboard menu value for the XP roles page, which lives in its own table, not GuildConfig. */
+export const XP_ROLES_PICK = 'xpRoles';
 
 const GROUPS: { name: keyof typeof t.setup.groups; keys: SettingKey[] }[] = [
   { name: 'verification', keys: ['verificationChannelId', 'verifiedRoleId', 'minAccountAgeDays'] },
@@ -70,6 +74,8 @@ const GROUPS: { name: keyof typeof t.setup.groups; keys: SettingKey[] }[] = [
     ],
   },
   { name: 'logs', keys: ['modLogChannelId', 'serverLogChannelId'] },
+  // Listed last, so the XP roles menu entry appended after it sits next to it.
+  { name: 'game', keys: ['rankUpChannelId'] },
 ];
 
 export const isSettingKey = (key: string | undefined): key is SettingKey =>
@@ -93,22 +99,26 @@ export function setupOverview(config: GuildConfig, notice?: string): BaseMessage
     .addFields(
       GROUPS.map((group) => ({
         name: t.setup.groups[group.name],
-        value: group.keys
-          .map((key) => `**${t.setup.settings[key].label}:** ${formatValue(config, key)}`)
-          .join('\n'),
+        value: [
+          ...group.keys.map(
+            (key) => `**${t.setup.settings[key].label}:** ${formatValue(config, key)}`,
+          ),
+          ...(group.name === 'game' ? [`**${t.xpRoles.label}:** ${t.setup.xpRolesHint}`] : []),
+        ].join('\n'),
       })),
     );
 
   const menu = new StringSelectMenuBuilder()
     .setCustomId('setup:pick')
     .setPlaceholder(t.setup.pickPlaceholder)
-    .addOptions(
-      GROUPS.flatMap((group) => group.keys).map((key) => ({
+    .addOptions([
+      ...GROUPS.flatMap((group) => group.keys).map((key) => ({
         label: t.setup.settings[key].label,
         description: t.setup.settings[key].description,
         value: key,
       })),
-    );
+      { label: t.xpRoles.label, description: t.xpRoles.description, value: XP_ROLES_PICK },
+    ]);
 
   return {
     embeds: [embed],

@@ -18,7 +18,7 @@ export default defineCommand({
     // Public on purpose, so members can show off and compare.
     await interaction.deferReply();
     await interaction.editReply(
-      await statsReply(interaction.guildId, user, user.id === interaction.user.id),
+      await statsReply(interaction.guild, user, user.id === interaction.user.id),
     );
   },
 });

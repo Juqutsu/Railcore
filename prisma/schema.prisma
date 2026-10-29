@@ -32,7 +32,32 @@ model GuildConfig {
   leaveChannelId        String?
   /// Custom leave text, same placeholders; null = default text.
   leaveMessage          String?
+  /// Where rank-ups from XP roles are announced; null = not announced.
+  rankUpChannelId       String?
+  /// Start of the last full Bloxlink pass for XP roles; it runs daily to find new links.
+  xpRolesSyncedAt       DateTime?
   updatedAt             DateTime @updatedAt
+}
+
+/// A role members get once their in-game XP reaches `minXp`. Tiers stack.
+model XpRole {
+  guildId String
+  roleId  String
+  minXp   Int
+
+  @@id([guildId, roleId])
+}
+
+/// A member whose Roblox account the bot knows, so their XP roles can be kept in sync.
+model LinkedMember {
+  guildId   String
+  userId    String
+  robloxId  String
+  /// XP at the last sync. Rank-ups are only announced when this grows.
+  xp        Int?
+  updatedAt DateTime @updatedAt
+
+  @@id([guildId, userId])
 }
 
 /// Latest time each member accepted the rules.

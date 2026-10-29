@@ -338,6 +338,10 @@ export const t = {
     distance: '🛤️ Distance',
     km: (km: string) => `${km} km`,
     stops: '🚏 Stops served',
+    rank: '🎖️ Rank',
+    noRank: '*None yet*',
+    toNext: (xp: string, role: string) => `${xp} XP to ${role}`,
+    topRank: 'Top rank reached',
     notLinkedSelf:
       "You haven't linked a Roblox account yet. Verify with **Bloxlink** on this server, then try again.",
     notLinked: (user: string) => `${user} hasn't linked a Roblox account with Bloxlink yet.`,
@@ -346,6 +350,42 @@ export const t = {
     keyRejected: (host: string) =>
       `\`${host}\` rejected the bot's API key, so game stats are set up wrong. Please let a staff member know; the bot log has the details.`,
     bot: "Bots don't drive trains on Falkenberg Railways.",
+  },
+
+  xpRoles: {
+    label: 'XP roles',
+    description: 'Roles members get from their in-game XP.',
+    intro:
+      'Members get every role whose XP they have reached, so roles stack. The bot keeps them in sync about every 10 minutes and removes roles that no longer fit. Roles not listed here are never touched.',
+    none: '*No XP roles yet. Add the first one below.*',
+    tierLine: (xp: string, role: string) => `\`${xp} XP\` → ${role}`,
+    xp: (xp: string) => `From ${xp} XP`,
+    deletedRole: 'Deleted role',
+    removePlaceholder: 'Remove an XP role…',
+    add: 'Add or change',
+    sync: 'Sync everyone now',
+    modalTitle: 'XP role',
+    roleLabel: 'Role',
+    roleHint: 'Picking a role that is already listed changes its XP.',
+    xpLabel: 'XP needed',
+    xpHint: (max: string) => `Whole number from 0 to ${max}.`,
+    invalidXp: (max: string) => `Enter a whole number of XP from 0 to ${max}.`,
+    tooMany: (max: number) => `You can have up to ${max} XP roles.`,
+    elevatedRole: (role: string, permissions: string) =>
+      `${role} has staff permissions (**${permissions}**). XP roles are earned by playing, so they can't carry those.`,
+    aboveYou: (role: string) =>
+      `You can only use roles below your own highest role, and you need **Manage Roles**. ${role} isn't one you could hand out yourself.`,
+    saved: (role: string, xp: string) => `✅ ${role} now comes at **${xp} XP**.`,
+    removed: (role: string) =>
+      `✅ Removed ${role}. Members keep it, but the bot no longer gives or takes it.`,
+    syncStarted: (members: number, minutes: number) =>
+      `🔄 Checking all ${members} members with Bloxlink. This takes about ${minutes} minute${minutes === 1 ? '' : 's'}.`,
+    syncRunning: '🔄 A sync is already running. Try again when it has finished.',
+    syncNeedsKeys:
+      'Syncing needs `ROBLOX_API_KEY` and `BLOXLINK_API_KEY` in the bot `.env`. See the README.',
+    auditReason: 'XP roles',
+    rankUpTitle: '🎉 Rank up!',
+    rankUp: (member: string, role: string) => `${member} is now ${role}!`,
   },
 
   leaderboard: {
@@ -476,7 +516,9 @@ export const t = {
       welcome: 'Welcome & leave',
       tickets: 'Tickets & applications',
       logs: 'Logs',
+      game: 'Game',
     },
+    xpRolesHint: 'pick *XP roles* in the menu below',
     pickPlaceholder: 'Choose a setting to change…',
     editTitle: (label: string) => `Setup · ${label}`,
     current: 'Current',
@@ -563,6 +605,10 @@ export const t = {
       serverLogChannelId: {
         label: 'Server log channel',
         description: 'Edits, deletes, joins, leaves, role and nickname changes.',
+      },
+      rankUpChannelId: {
+        label: 'Rank-up channel',
+        description: 'Members reaching a new XP role are announced here.',
       },
     },
   },

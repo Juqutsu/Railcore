@@ -4,6 +4,7 @@ import {
   ButtonStyle,
   escapeMarkdown,
   type BaseMessageOptions,
+  type Guild,
   type User,
 } from 'discord.js';
 import { env } from '../env.js';
@@ -12,6 +13,8 @@ import { embeds } from '../utils/embeds.js';
 import { UserError } from '../utils/errors.js';
 import { logger } from '../utils/logger.js';
 import { parseProgress } from '../utils/progress.js';
+import { rankOf } from '../utils/xpTiers.js';
+import { activeTiers, applyXp, tiersOf } from './xpRoles.js';
 
 // Falkenberg Railways itself; the API key is scoped to this universe.
 const UNIVERSE_ID = '10123051468';
@@ -50,10 +53,13 @@ async function getJson(url: string, init: RequestInit = {}): Promise<unknown> {
   }
 }
 
+/** A rejected API key: a setup mistake that retrying won't fix. */
+export const isKeyRejected = (err: unknown): err is HttpError =>
+  err instanceof HttpError && (err.status === 401 || err.status === 403);
+
 /** Turns a failed lookup into the message the member sees, and logs the cause with `context`. */
 function lookupError(err: unknown, context: object): UserError {
-  // A rejected key is a setup mistake that retrying won't fix, so it gets its own message.
-  if (err instanceof HttpError && (err.status === 401 || err.status === 403)) {
+  if (isKeyRejected(err)) {
     logger.error({ err, ...context }, 'Game data API key rejected');
     return new UserError(t.stats.keyRejected(err.host));
   }
@@ -175,22 +181,44 @@ export function assertGameDataReady(needsBloxlink: boolean): void {
   }
 }
 
+/** XP of a known Roblox account; 0 if it never played. Throws when Open Cloud fails. */
+export const xpOf = async (robloxId: string) => (await progressOf(robloxId))?.xp ?? 0;
+
+/** The member's Roblox account and XP, or null if not linked. Throws when an API fails. */
+export async function linkAndXp(
+  guildId: string,
+  userId: string,
+): Promise<{ robloxId: string; xp: number } | null> {
+  const robloxId = await linkedRobloxId(`${guildId}:${userId}`);
+  return robloxId ? { robloxId, xp: await xpOf(robloxId) } : null;
+}
+
 const count = (n: number) => n.toLocaleString('en-US');
 const km = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 1 });
 const profileUrl = (robloxId: string) => `https://www.roblox.com/users/${robloxId}/profile`;
 
 export async function statsReply(
-  guildId: string,
+  guild: Guild,
   user: User,
   self: boolean,
 ): Promise<BaseMessageOptions> {
   let robloxId: string | null;
   let progress;
   try {
-    robloxId = await linkedRobloxId(`${guildId}:${user.id}`);
+    robloxId = await linkedRobloxId(`${guild.id}:${user.id}`);
     progress = robloxId ? await progressOf(robloxId) : null;
   } catch (err) {
     throw lookupError(err, { userId: user.id });
+  }
+
+  const tiers = await tiersOf(guild.id);
+  const member = guild.members.cache.get(user.id);
+  if (member && tiers.length) {
+    // Whoever is looked at gets their XP roles refreshed; it doesn't hold up the reply.
+    const link = robloxId ? { robloxId, xp: progress?.xp ?? 0 } : null;
+    void applyXp(member, link, tiers).catch((err: unknown) =>
+      logger.warn({ err, userId: user.id }, 'XP role sync failed'),
+    );
   }
   if (!robloxId) {
     throw new UserError(self ? t.stats.notLinkedSelf : t.stats.notLinked(user.toString()));
@@ -219,6 +247,16 @@ export async function statsReply(
       { name: t.stats.distance, value: t.stats.km(km(progress.km)), inline: true },
       { name: t.stats.stops, value: count(progress.stops), inline: true },
     );
+    // Only roles the bot really hands out, so the card never shows a rank nobody can get.
+    const active = activeTiers(guild, tiers);
+    if (active.length) {
+      const { current, next } = rankOf(active, progress.xp);
+      const rank = current ? `<@&${current.roleId}>` : t.stats.noRank;
+      const toNext = next
+        ? t.stats.toNext(count(next.minXp - progress.xp), `<@&${next.roleId}>`)
+        : t.stats.topRank;
+      embed.addFields({ name: t.stats.rank, value: `${rank}\n${toNext}`, inline: true });
+    }
   }
   return { embeds: [embed] };
 }
