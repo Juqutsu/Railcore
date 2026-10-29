@@ -4,8 +4,7 @@ import { isSettingKey, setupEditor } from '../../services/setup.js';
 import { t } from '../../text.js';
 import { UserError } from '../../utils/errors.js';
 
-// No permission re-check in the setup:* handlers: the dashboard is ephemeral, so only the
-// user who passed /setup's command permission (Server Settings → Integrations) can click it.
+// Manage Server is re-checked for every setup:* click in events/interactionCreate.ts.
 export default defineComponent({
   kind: 'select',
   id: 'setup:pick',

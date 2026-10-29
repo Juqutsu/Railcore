@@ -57,7 +57,7 @@ flowchart LR
 | Right-click member → Warn, Timeout, Show warnings | Moderate Members | Same as the slash commands, with a short form                       |
 | Right-click message → Report message              | Everyone         | Opens a private report ticket with a copy of the message            |
 
-Staff roles come from `/setup`, and administrators always count as staff. You can change who sees each command in **Server Settings → Integrations → Railcore**, but the right-click Warn and Timeout forms check **Moderate Members** again when they are sent. For actions on members the role hierarchy applies: nobody can moderate themselves, the owner, the bot, or someone with an equal or higher role.
+Staff roles come from `/setup`, and administrators always count as staff. You can change who sees each command in **Server Settings → Integrations → Railcore**, but the `/setup` dashboard re-checks **Manage Server** on every click, and the right-click Warn and Timeout forms re-check **Moderate Members** when they are sent. For actions on members the role hierarchy applies: nobody can moderate themselves, the owner, the bot, or someone with an equal or higher role.
 
 ## 🚀 Quick start
 

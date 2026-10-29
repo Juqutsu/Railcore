@@ -1,4 +1,4 @@
-import { Events } from 'discord.js';
+import { Events, PermissionFlagsBits } from 'discord.js';
 import {
   commandKey,
   commands,
@@ -34,6 +34,13 @@ export default defineEvent({
             : 'select';
         const component = components.get(componentKey(kind, `${scope}:${action}`));
         if (!component) throw new UserError(t.errors.unknownInteraction);
+        // The /setup dashboard can stay open after someone loses Manage Server, so re-check every click.
+        if (
+          scope === 'setup' &&
+          !interaction.memberPermissions.has(PermissionFlagsBits.ManageGuild)
+        ) {
+          throw new UserError(t.errors.noPermission);
+        }
         await component.execute(interaction, args);
       }
     } catch (err) {
