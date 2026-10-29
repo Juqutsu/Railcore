@@ -1,22 +1,86 @@
-# Railcore
+<div align="center">
 
-The Discord bot for **Falkenberg Railways**, a Roblox railway simulator.
+# 🚆 Railcore
 
-- **Verification**: a rules panel with a Verify button. It checks the account age against a minimum, has an anti-spam cooldown and alerts staff about new accounts. Verification lives in its own module, so a Roblox account link can be added later.
-- **Tickets and staff applications**: Support, Bug Report and Staff Application tickets in private channels, with Claim and Close buttons. Applications get Accept / Deny buttons. Staff can add or remove people with `/ticket add` and `/ticket remove`. When the opener stops answering staff, the bot reminds them, then closes the ticket if it stays quiet. Closed tickets produce an HTML transcript with the images and files embedded, which goes to a log channel and to the member by DM.
-- **Moderation**: `/warn`, `/warnings`, `/clearwarn`, `/timeout`, `/untimeout`, `/kick`, `/ban`, `/unban` and `/purge`. Every action becomes a numbered case, the member gets a DM, and the action is posted to the mod log. Staff can't moderate equal or higher roles.
-- **Right-click menu** (Apps): on a member, Warn, Timeout and Show warnings; on a message, Report message, which opens a private report ticket with a copy of the message.
-- **Server log**: message edits and deletions, members joining and leaving, role changes and nickname changes.
-- **Configuration**: everything is set up in Discord with `/setup`, so no IDs live in the code.
+**The Discord bot for Falkenberg Railways, a Roblox railway simulator.**
+<br>
+Verification, welcome messages, tickets, staff applications, moderation and logs, all configured from inside Discord.
 
-Built with TypeScript, discord.js 14, PostgreSQL + Prisma and pino, and deployed with Docker.
+[![CI](https://github.com/Juqutsu/Railcore/actions/workflows/ci.yml/badge.svg)](https://github.com/Juqutsu/Railcore/actions/workflows/ci.yml)
+![Node.js 24](https://img.shields.io/badge/Node.js-24-5FA04E?logo=nodedotjs&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-6-3178C6?logo=typescript&logoColor=white)
+![discord.js 14](https://img.shields.io/badge/discord.js-14-5865F2?logo=discord&logoColor=white)
+![PostgreSQL 18](https://img.shields.io/badge/PostgreSQL-18-4169E1?logo=postgresql&logoColor=white)
+![Prisma 7](https://img.shields.io/badge/Prisma-7-2D3748?logo=prisma&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)
+
+[Features](#-features) · [Commands](#-commands) · [Quick start](#-quick-start) · [Setup in Discord](#-set-it-up-in-discord) · [Deploy](#-deploy-with-docker) · [Development](#%EF%B8%8F-development)
+
+</div>
 
 ---
 
-## 1. Create the Discord bot
+## ✨ Features
+
+|     | Module                 | What it does                                                                                                                                                                                                                                             |
+| --- | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 🎫  | **Verification**       | A rules panel with a Verify button. Checks the Discord account age against a minimum, has an anti-spam cooldown and alerts staff about accounts that are too new. Built as its own module, ready for a Roblox account link.                              |
+| 👋  | **Welcome & leave**    | A greeting card with a ping when someone joins, and an announcement when someone leaves. Both texts are editable in `/setup` with `{user}`, `{name}`, `{server}` and `{count}`.                                                                          |
+| 🛟  | **Tickets**            | Support, Bug Report and message-report tickets in private channels. Claim and Close buttons, `/ticket add` and `/ticket remove`, a reminder and auto-close when the opener stops answering staff, and an HTML transcript with images and files embedded. |
+| 📋  | **Staff applications** | Application tickets with Accept and Deny buttons, a private staff note, a DM to the applicant, and the application role on acceptance.                                                                                                                   |
+| 🛡️  | **Moderation**         | Warn, timeout, kick, ban and purge. Every action becomes a numbered case with a mod-log entry. Actions on members also DM them and check the role hierarchy.                                                                                             |
+| 🖱️  | **Right-click menu**   | Warn, Timeout and Show warnings on a member. Report message on any message, which opens a private report ticket with a copy of it.                                                                                                                       |
+| 📜  | **Server log**         | Message edits and deletions, bulk deletes, joins, leaves, role changes and nickname changes.                                                                                                                                                             |
+| ⚙️  | **`/setup` dashboard** | Every channel, role, number and text is set in Discord. The dashboard warns when the bot lacks permissions. No IDs live in the code.                                                                                                                     |
+
+```mermaid
+flowchart LR
+    Discord(["Discord"]) <-->|"gateway + REST"| Handlers["handlers.ts<br/>auto-loads commands,<br/>events and interactions"]
+    Handlers --> Services["services/<br/>setup · verification · welcome<br/>tickets · moderation · logs"]
+    Services <-->|Prisma 7| DB[("PostgreSQL 18")]
+    Services -->|"embeds, transcripts, DMs"| Discord
+```
+
+## 💬 Commands
+
+| Command                                           | Who can use it   | What it does                                                        |
+| ------------------------------------------------- | ---------------- | ------------------------------------------------------------------- |
+| `/setup`                                          | Manage Server    | Opens the settings dashboard (only you see it)                      |
+| `/verify-panel`                                   | Manage Server    | Posts the verification panel in the verification channel            |
+| `/ticket-panel`                                   | Manage Server    | Posts the ticket panel in the current channel                       |
+| `/ticket add` · `/ticket remove`                  | Staff roles      | Gives a member access to the current ticket, or takes it away       |
+| `/warn` · `/warnings` · `/clearwarn`              | Moderate Members | Warns a member, lists active warnings, clears one or all            |
+| `/timeout` · `/untimeout`                         | Moderate Members | Times a member out (`10m`, `2h`, `1d`, up to 28 days) or lifts it   |
+| `/kick`                                           | Kick Members     | Kicks a member                                                      |
+| `/ban` · `/unban`                                 | Ban Members      | Bans (optionally deleting the last hour, day or week), unbans by ID |
+| `/purge`                                          | Manage Messages  | Deletes up to 1–100 of the last 100 messages, optionally one user's |
+| Right-click member → Warn, Timeout, Show warnings | Moderate Members | Same as the slash commands, with a short form                       |
+| Right-click message → Report message              | Everyone         | Opens a private report ticket with a copy of the message            |
+
+Staff roles come from `/setup`, and administrators always count as staff. You can change who sees each command in **Server Settings → Integrations → Railcore**, but the right-click Warn and Timeout forms check **Moderate Members** again when they are sent. For actions on members the role hierarchy applies: nobody can moderate themselves, the owner, the bot, or someone with an equal or higher role.
+
+## 🚀 Quick start
+
+You need **Node.js 24** (LTS). Docker is not needed for development.
+
+```bash
+git clone https://github.com/Juqutsu/Railcore.git && cd Railcore
+npm install
+cp .env.example .env     # then fill in DISCORD_BOT_TOKEN and TEST_SERVER_ID
+npm run db:dev           # starts a local PostgreSQL 18 in the background (first run sets it up)
+npm run db:migrate       # creates the tables
+npm run commands:dev     # registers the slash commands on your test server
+npm run dev              # starts the bot and restarts it when you save a file
+```
+
+`npm run db:dev` runs a real PostgreSQL 18 (the same major version as in Docker) from the `embedded-postgres` package. You don't need Docker or admin rights for it. It listens on `localhost:5433` only, which matches the URL in `.env.example`, and keeps its data in `.dev-db/`. Running it again while the database is up is harmless, and `npm run db:stop` shuts it down.
+
+`npm run dev` also starts the database if it isn't running, for example after a reboot. To start over with an empty database, run `npm run db:stop`, delete `.dev-db/`, then run `npm run db:dev` and `npm run db:migrate`.
+
+### Create the Discord bot
 
 1. Open the [Discord Developer Portal](https://discord.com/developers/applications), click **New Application** and name it "Railcore".
-2. Go to **Bot**, click **Reset Token** and copy the token. It goes into `.env` later; never share it.
+2. Go to **Bot**, click **Reset Token** and copy the token. It goes into `.env`; never share it.
 3. Still on **Bot**, under **Privileged Gateway Intents**, turn on **Server Members Intent** and **Message Content Intent**. The bot refuses to start without them.
 4. Invite the bot. Replace `APP_ID` with the **Application ID** from **General Information**:
 
@@ -27,23 +91,6 @@ Built with TypeScript, discord.js 14, PostgreSQL + Prisma and pino, and deployed
    This grants View Channels, Send Messages, Embed Links, Attach Files, Read Message History, Manage Channels, Manage Roles, Manage Messages, Kick Members, Ban Members and Moderate Members.
 
 5. In **Server Settings → Roles**, drag the Railcore role **above** the Verified role, the application role, and every role the bot should be able to moderate. Discord only lets a bot manage roles below its own.
-
-## 2. Run it locally
-
-You need **Node.js 24** (LTS). Docker is not needed for development.
-
-```bash
-npm install
-cp .env.example .env     # then fill in DISCORD_BOT_TOKEN and TEST_SERVER_ID
-npm run db:dev           # starts a local PostgreSQL 18 in the background (first run sets it up)
-npm run db:migrate       # creates the tables
-npm run commands:dev     # registers the slash commands on your test server
-npm run dev              # starts the bot and restarts it when you save a file
-```
-
-`npm run db:dev` runs a real PostgreSQL 18 (the same major version as in Docker) from the `embedded-postgres` package. You don't need Docker or admin rights for it. It listens on `localhost:5433` only, which matches the URL in `.env.example`, and keeps its data in `.dev-db/`. Running it again while the database is up is harmless. `npm run db:stop` shuts it down.
-
-`npm run dev` also starts the database if it isn't running, for example after a reboot. To start over with an empty database, run `npm run db:stop`, delete `.dev-db/`, then run `npm run db:dev` and `npm run db:migrate`.
 
 ### Environment variables
 
@@ -58,7 +105,7 @@ npm run dev              # starts the bot and restarts it when you save a file
 | `LOG_LEVEL`         | optional       | `fatal`, `error`, `warn`, `info` (default), `debug` or `trace`.                                          |
 | `NODE_ENV`          | set by Docker  | `production` switches logs to JSON. Leave it unset locally for readable, colored logs.                   |
 
-## 3. Register the slash commands
+### Register the slash commands
 
 Discord only shows commands that have been registered. Register again whenever you add a command or change its name, description or options.
 
@@ -70,30 +117,21 @@ Discord only shows commands that have been registered. Register again whenever y
 
 If commands are registered both on the test server and globally, they show up twice on the test server. Clear the test-server copies with the last command.
 
-## 4. Set it up in Discord
+## 🧭 Set it up in Discord
 
 1. Run **`/setup`** and set each item from the menu:
    - **Verification**: verification channel, Verified role, minimum account age (default 7 days, `0` turns the check off).
-   - **Tickets & applications**: ticket category, ticket log channel, staff roles, the application role that accepted applicants get, and the reminder and auto-close times for quiet tickets (default 24 hours each, `0` turns them off).
+   - **Welcome & leave**: the welcome and leave channels (not set = no message) and their texts. Texts can use `{user}` (mention), `{name}` (display name), `{server}` and `{count}` (member count). **Use default** goes back to the built-in text. Only the new member is pinged, even if the text contains `@everyone`. Bots get no messages.
+   - **Tickets & applications**: ticket category, ticket log channel, staff roles, the application role that accepted applicants get, and the reminder and auto-close times. When staff wrote last and the opener stays quiet, the opener is reminded after the reminder time, and the ticket closes once the auto-close time has passed after that (default 24 + 24 hours). A reminder time of `0` turns both off; an auto-close time of `0` keeps only the reminder.
    - **Logs**: mod log channel and server log channel.
 
    The dashboard warns you when the bot is missing permissions in a channel you pick.
 
 2. Run **`/verify-panel`**. It posts the panel in the verification channel.
 3. Run **`/ticket-panel`** in the channel where members should open tickets.
-4. Hide your normal channels from `@everyone` and allow the Verified role, so only verified members see them.
+4. Hide your normal channels from `@everyone` and allow the Verified role, so only verified members see them. Keep the welcome channel visible to `@everyone` if new members should see their greeting before they verify.
 
-### Who can use what
-
-- `/setup`, `/verify-panel`, `/ticket-panel`: **Manage Server**
-- `/warn`, `/warnings`, `/clearwarn`, `/timeout`, `/untimeout`: **Moderate Members**
-- `/kick`: **Kick Members** · `/ban`, `/unban`: **Ban Members** · `/purge`: **Manage Messages**
-- Right-click Warn, Timeout, Show warnings: **Moderate Members** · Report message: everyone
-- Claiming tickets, reviewing applications, `/ticket add` and `/ticket remove`: the **staff roles** from `/setup`. Administrators always count as staff.
-
-You can change who sees each command per role or member in **Server Settings → Integrations → Railcore**. The role hierarchy still applies: nobody can moderate themselves, the owner, the bot, or someone with an equal or higher role.
-
-## 5. Deploy on a VPS with Docker
+## 🐳 Deploy with Docker
 
 On the server (any Linux VPS, 1 GB RAM is plenty):
 
@@ -102,7 +140,7 @@ On the server (any Linux VPS, 1 GB RAM is plenty):
 curl -fsSL https://get.docker.com | sh
 
 # Get the code and configure it
-git clone <your-repo-url> railcore && cd railcore
+git clone https://github.com/Juqutsu/Railcore.git railcore && cd railcore
 cp .env.example .env
 nano .env                # set DISCORD_BOT_TOKEN and a strong POSTGRES_PASSWORD
 
@@ -144,9 +182,12 @@ docker compose start bot
 
 Use your own `POSTGRES_USER` / `POSTGRES_DB` if you changed them.
 
-> **Careful:** `docker compose down` stops everything but keeps the data. `docker compose down -v` also **deletes the database volume**, and all cases, tickets and settings with it.
+> [!CAUTION]
+> `docker compose down` stops everything but keeps the data. `docker compose down -v` also **deletes the database volume**, and all cases, tickets and settings with it.
 
-## Scripts
+## 🛠️ Development
+
+### Scripts
 
 | Script                    | What it does                                                           |
 | ------------------------- | ---------------------------------------------------------------------- |
@@ -164,7 +205,9 @@ Use your own `POSTGRES_USER` / `POSTGRES_DB` if you changed them.
 | `npm run format`          | Prettier                                                               |
 | `npm test`                | Unit tests (Node's built-in test runner)                               |
 
-## Project structure
+Every push to `main` and every pull request runs typecheck, lint, the Prettier check, the tests and a Docker build on GitHub Actions.
+
+### Project structure
 
 ```
 src/
@@ -172,39 +215,39 @@ src/
 ├─ env.ts              Validates .env
 ├─ text.ts             All user-facing text
 ├─ handlers.ts         Loads commands, events and interactions automatically
-├─ commands/           Slash commands, one file each (admin/, verification/, tickets/, moderation/)
-├─ events/             Discord events (interactions, server log, ready)
+├─ commands/           Slash and right-click commands, one file each (admin/, context/, verification/, tickets/, moderation/)
+├─ events/             Discord events (interactions, welcome and server log, ready)
 ├─ interactions/       Buttons, select menus and modals (buttons/, selects/, modals/)
-├─ services/           Feature logic: setup, verification, tickets, applications, transcripts, moderation, logs
+├─ services/           Feature logic: setup, verification, welcome, tickets, applications, transcripts, moderation, logs
 ├─ database/           Prisma client
-├─ utils/              Embeds, errors, permissions, durations, cooldowns, logger
-└─ scripts/            deploy-commands.ts
+├─ utils/              Embeds, errors, permissions, durations, cooldowns, templates, logger
+└─ scripts/            deploy-commands.ts, dev-db.ts
 prisma/
 ├─ schema.prisma       Database schema
 └─ migrations/         SQL migrations, applied in order
 ```
 
-## Customizing
+### Customizing
 
 - **Wording**: every message, button label and command description is in [`src/text.ts`](src/text.ts). Edit freely, but keep the function signatures.
-- **Colors and footer**: [`src/utils/embeds.ts`](src/utils/embeds.ts). Every embed in the bot is created there.
+- **Colors**: [`src/utils/embeds.ts`](src/utils/embeds.ts). Every embed in the bot is created there. The footer text is `footer` in `src/text.ts`.
 - **Ticket questions**: question text is in `src/text.ts` under `tickets.questions`. Lengths and order are in `QUESTIONS` in [`src/services/tickets.ts`](src/services/tickets.ts). A modal holds at most 5 questions.
 - **A new command**: add a file in `src/commands/<group>/` that default-exports `defineCommand({ data, execute })`, then register the commands again. The loader picks the file up automatically.
 - **A new button or modal**: add a file in `src/interactions/<buttons|selects|modals>/` that default-exports `defineComponent({ kind, id: 'scope:action', execute })`. A button with the custom ID `scope:action:arg1:arg2` calls that handler with `['arg1', 'arg2']`.
 - **Database changes**: edit `prisma/schema.prisma`, then run `npm run db:migrate -- --name what-changed`. Commit the new folder in `prisma/migrations/`.
 
-## Troubleshooting
+## 🩺 Troubleshooting
 
 | Symptom                                                                                | Fix                                                                                                                                             |
 | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Startup failed` with `Used disallowed intents`                                        | Turn on both privileged intents (step 1.3).                                                                                                     |
+| `Startup failed` with `Used disallowed intents`                                        | Turn on both privileged intents (see [Create the Discord bot](#create-the-discord-bot)).                                                        |
 | `Startup failed` with `Can't reach database server` or `Connection terminated` (local) | The local database isn't running. Run `npm run db:dev`; if it still fails, look at `.dev-db/postgres.log`.                                      |
 | Users see "I'm missing a permission to do that"                                        | Check the bot's role position and its permissions in that channel. Picking a channel again in `/setup` tells you which permissions are missing. |
-| A command is missing                                                                   | Register the commands again (section 3).                                                                                                        |
+| A command is missing                                                                   | Register the commands again (see [Register the slash commands](#register-the-slash-commands)).                                                  |
 | Commands show up twice                                                                 | Registered on the test server and globally: run `npm run commands:dev -- --clear`.                                                              |
 | Users see "Something went off the rails … Reference: `abc123`"                         | Search the logs for `"ref":"abc123"` (or `ref: "abc123"` locally) to find the full error.                                                       |
 
-## Known limitations
+## 📌 Known limitations
 
 - **Single bot process**: the settings cache and the ticket-close lock live in memory. Don't run two copies of the bot against the same database.
 - **Server log content**: Discord only sends a message's old text if the bot had it cached. The cache covers messages sent since the last start, up to the last 200 per channel. Edits of older messages show the old text as "Unknown", and deletions of older messages aren't logged.
