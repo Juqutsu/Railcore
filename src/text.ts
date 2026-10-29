@@ -35,6 +35,14 @@ export const t = {
     purge: 'Bulk delete recent messages in this channel',
   },
 
+  /** Right-click menu entries (Apps). Max 32 characters; re-register commands after changing. */
+  contextMenus: {
+    warn: 'Warn',
+    timeout: 'Timeout',
+    warnings: 'Show warnings',
+    report: 'Report message',
+  },
+
   /** Slash-command option descriptions (max 100 characters). */
   options: {
     user: 'The member',
@@ -107,13 +115,33 @@ export const t = {
     panelBody:
       'Pick what fits best and we will open a private channel with our staff.\n\n🛟 **Support**: questions, problems or anything else\n🐞 **Bug Report**: something broken in the game\n📋 **Staff Application**: join the Falkenberg Railways team',
     types: {
-      SUPPORT: { label: 'Support', emoji: '🛟', channel: 'support', title: 'Support ticket' },
-      BUG_REPORT: { label: 'Bug Report', emoji: '🐞', channel: 'bug', title: 'Bug report' },
+      SUPPORT: {
+        label: 'Support',
+        emoji: '🛟',
+        channel: 'support',
+        title: 'Support ticket',
+        intro: 'Thanks for reaching out! A staff member will be with you shortly.',
+      },
+      BUG_REPORT: {
+        label: 'Bug Report',
+        emoji: '🐞',
+        channel: 'bug',
+        title: 'Bug report',
+        intro: 'Thanks for reporting! A staff member will be with you shortly.',
+      },
       APPLICATION: {
         label: 'Staff Application',
         emoji: '📋',
         channel: 'application',
         title: 'Staff application',
+        intro: 'Thanks for applying! Staff will review your answers and get back to you here.',
+      },
+      REPORT: {
+        label: 'Report',
+        emoji: '🚩',
+        channel: 'report',
+        title: 'Message report',
+        intro: 'Thanks for the report! Staff will take a look and may ask you questions here.',
       },
     },
     /** Modal questions. Labels: max 45 characters, placeholders: max 100. */
@@ -142,10 +170,20 @@ export const t = {
           placeholder: 'Tell us what you would bring to the team',
         },
       },
+      REPORT: {
+        details: {
+          label: 'What is wrong with this message?',
+          placeholder: 'Optional, but it helps staff',
+        },
+      },
     },
-    intro: 'Thanks for reaching out! A staff member will be with you shortly.',
-    applicationIntro:
-      'Thanks for applying! Staff will review your answers and get back to you here.',
+    reportAuthor: 'Author',
+    reportMessage: 'Reported message',
+    reportLink: 'Link',
+    reportJump: 'Jump to message',
+    reportAttachments: 'Attachments',
+    reportOwn: "You can't report your own message.",
+    reportExpired: 'This report form expired. Please right-click the message and report it again.',
     openedBy: 'Opened by',
     openedTitle: 'Ticket opened',
     opened: (channel: string) => `All aboard! Your ticket is ready: ${channel}`,
@@ -263,6 +301,12 @@ export const t = {
 
   mod: {
     noReason: 'No reason given',
+    warnModalTitle: (user: string) => `Warn ${user}`,
+    timeoutModalTitle: (user: string) => `Time out ${user}`,
+    reasonLabel: 'Reason',
+    reasonPlaceholder: 'The member sees this in their DM',
+    durationLabel: 'Duration',
+    durationPlaceholder: 'e.g. 10m, 2h or 1d (max 28d)',
     actions: {
       WARN: 'Warning',
       TIMEOUT: 'Timeout',

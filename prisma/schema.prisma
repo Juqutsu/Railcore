@@ -38,6 +38,7 @@ enum TicketType {
   SUPPORT
   BUG_REPORT
   APPLICATION
+  REPORT
 }
 
 enum TicketStatus {

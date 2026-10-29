@@ -6,18 +6,15 @@ import {
 } from 'discord.js';
 import { defineCommand } from '../../handlers.js';
 import {
-  assertBotCan,
   assertCanModerate,
-  MAX_TIMEOUT_MS,
-  MIN_TIMEOUT_MS,
+  assertTimeoutable,
   moderate,
+  parseTimeout,
   reasonOption,
   requireMember,
   userOption,
 } from '../../services/moderation.js';
 import { t } from '../../text.js';
-import { parseDuration } from '../../utils/duration.js';
-import { UserError } from '../../utils/errors.js';
 
 export default defineCommand({
   data: new SlashCommandBuilder()
@@ -38,14 +35,8 @@ export default defineCommand({
   async execute(interaction) {
     const member = requireMember(interaction);
     assertCanModerate(interaction.member, member);
-    const ms = parseDuration(interaction.options.getString('duration', true));
-    if (ms === null || ms < MIN_TIMEOUT_MS || ms > MAX_TIMEOUT_MS) {
-      throw new UserError(t.mod.invalidDuration);
-    }
-    if (member.permissions.has(PermissionFlagsBits.Administrator)) {
-      throw new UserError(t.mod.timeoutAdmin);
-    }
-    assertBotCan(member.moderatable, member);
+    const ms = parseTimeout(interaction.options.getString('duration', true));
+    assertTimeoutable(member);
 
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     await moderate(interaction, {

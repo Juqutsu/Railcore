@@ -1,9 +1,16 @@
 import {
+  LabelBuilder,
+  ModalBuilder,
+  PermissionFlagsBits,
+  TextInputBuilder,
+  TextInputStyle,
   time,
   TimestampStyles,
+  type BaseMessageOptions,
   type ChatInputCommandInteraction,
   type Guild,
   type GuildMember,
+  type ModalSubmitInteraction,
   type SlashCommandStringOption,
   type SlashCommandUserOption,
   type User,
@@ -11,16 +18,17 @@ import {
 import { prisma } from '../database/client.js';
 import type { CaseAction, ModCase } from '../generated/prisma/client.js';
 import { t } from '../text.js';
-import { formatDuration } from '../utils/duration.js';
-import { embeds, userLine } from '../utils/embeds.js';
+import { formatDuration, parseDuration } from '../utils/duration.js';
+import { clip, embeds, userLine } from '../utils/embeds.js';
 import { UserError } from '../utils/errors.js';
 import { sendDm } from './dm.js';
 import { sendLog } from './logs.js';
 
 export type MemberAction = Exclude<CaseAction, 'PURGE'>;
 
-export const MIN_TIMEOUT_MS = 60_000;
-export const MAX_TIMEOUT_MS = 28 * 86_400_000; // Discord's limit
+const MIN_TIMEOUT_MS = 60_000;
+const MAX_TIMEOUT_MS = 28 * 86_400_000; // Discord's limit
+const SHOWN_WARNINGS = 10;
 
 /** Shared options, so every mod command reads the same. */
 export const userOption = (option: SlashCommandUserOption) =>
@@ -51,6 +59,97 @@ export function assertCanModerate(moderator: GuildMember, target: GuildMember): 
 /** `able` is discord.js's kickable / bannable / moderatable, which covers the bot's role and permissions. */
 export function assertBotCan(able: boolean, target: GuildMember): void {
   if (!able) throw new UserError(t.mod.botCannot(target.toString()));
+}
+
+/** For modals, which only carry the user ID. */
+export async function fetchMember(guild: Guild, userId: string): Promise<GuildMember> {
+  const member = await guild.members.fetch(userId).catch(() => null);
+  if (!member) throw new UserError(t.mod.notMember);
+  return member;
+}
+
+/** Parses "10m", "2h"… and enforces Discord's 1 minute to 28 days range. */
+export function parseTimeout(input: string): number {
+  const ms = parseDuration(input);
+  if (ms === null || ms < MIN_TIMEOUT_MS || ms > MAX_TIMEOUT_MS) {
+    throw new UserError(t.mod.invalidDuration);
+  }
+  return ms;
+}
+
+export function assertTimeoutable(member: GuildMember): void {
+  if (member.permissions.has(PermissionFlagsBits.Administrator)) {
+    throw new UserError(t.mod.timeoutAdmin);
+  }
+  assertBotCan(member.moderatable, member);
+}
+
+const reasonInput = (required: boolean) =>
+  new LabelBuilder()
+    .setLabel(t.mod.reasonLabel)
+    .setTextInputComponent(
+      new TextInputBuilder()
+        .setCustomId('reason')
+        .setStyle(TextInputStyle.Paragraph)
+        .setPlaceholder(t.mod.reasonPlaceholder)
+        .setMaxLength(500)
+        .setRequired(required),
+    );
+
+export const warnModal = (user: User) =>
+  new ModalBuilder()
+    .setCustomId(`mod:warn:${user.id}`)
+    .setTitle(clip(t.mod.warnModalTitle(user.username), 45)) // Discord's modal title limit
+    .addLabelComponents(reasonInput(true));
+
+export const timeoutModal = (user: User) =>
+  new ModalBuilder()
+    .setCustomId(`mod:timeout:${user.id}`)
+    .setTitle(clip(t.mod.timeoutModalTitle(user.username), 45))
+    .addLabelComponents(
+      new LabelBuilder()
+        .setLabel(t.mod.durationLabel)
+        .setTextInputComponent(
+          new TextInputBuilder()
+            .setCustomId('duration')
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder(t.mod.durationPlaceholder)
+            .setMaxLength(20)
+            .setRequired(true),
+        ),
+      reasonInput(false),
+    );
+
+export async function warningsReply(guildId: string, user: User): Promise<BaseMessageOptions> {
+  const warnings = await prisma.modCase.findMany({
+    where: { guildId, targetId: user.id, action: 'WARN', clearedAt: null },
+    orderBy: { number: 'desc' },
+  });
+  if (!warnings.length) {
+    return { embeds: [embeds.success(undefined, t.mod.noWarnings(user.toString()))] };
+  }
+
+  // Reasons are clipped so ten of them stay inside the 4096-character embed limit.
+  const lines = warnings
+    .slice(0, SHOWN_WARNINGS)
+    .map((warning) =>
+      t.mod.warningLine(
+        warning.number,
+        time(warning.createdAt, TimestampStyles.ShortDate),
+        `<@${warning.moderatorId}>`,
+        clip(warning.reason ?? t.mod.noReason, 200),
+      ),
+    );
+  if (warnings.length > SHOWN_WARNINGS) {
+    lines.push(t.mod.moreWarnings(warnings.length - SHOWN_WARNINGS));
+  }
+  return {
+    embeds: [
+      embeds
+        .info(t.mod.warningsTitle(user.username, warnings.length), lines.join('\n\n'))
+        .setThumbnail(user.displayAvatarURL()),
+    ],
+  };
 }
 
 export async function nextCaseNumber(guildId: string): Promise<number> {
@@ -129,7 +228,7 @@ const DM_FIRST = new Set<CaseAction>(['KICK', 'BAN']);
  * reply. The caller validates and defers the interaction first.
  */
 export async function moderate(
-  interaction: ChatInputCommandInteraction<'cached'>,
+  interaction: ChatInputCommandInteraction<'cached'> | ModalSubmitInteraction<'cached'>,
   options: {
     action: MemberAction;
     target: User;

@@ -34,29 +34,28 @@ You need **Node.js 24** (LTS). Docker is not needed for development.
 ```bash
 npm install
 cp .env.example .env     # then fill in DISCORD_BOT_TOKEN and TEST_SERVER_ID
-npm run db:dev           # starts a local Postgres (Prisma Dev) in the background
+npm run db:dev           # starts a local PostgreSQL 18 in the background (first run sets it up)
 npm run db:migrate       # creates the tables
 npm run commands:dev     # registers the slash commands on your test server
 npm run dev              # starts the bot and restarts it when you save a file
 ```
 
-`npm run db:dev` always uses ports 51214 (database) and 51215 (shadow database), which match the URLs in `.env.example`. If either port is taken, it stops with a clear error instead.
+`npm run db:dev` runs a real PostgreSQL 18 (the same major version as in Docker) from the `embedded-postgres` package. You don't need Docker or admin rights for it. It listens on `localhost:5433` only, which matches the URL in `.env.example`, and keeps its data in `.dev-db/`. Running it again while the database is up is harmless. `npm run db:stop` shuts it down.
 
-After a reboot, run `npm run db:dev` again before `npm run dev`.
+`npm run dev` also starts the database if it isn't running, for example after a reboot. To start over with an empty database, run `npm run db:stop`, delete `.dev-db/`, then run `npm run db:dev` and `npm run db:migrate`.
 
 ### Environment variables
 
-| Variable              | Needed for        | What it is                                                                                               |
-| --------------------- | ----------------- | -------------------------------------------------------------------------------------------------------- |
-| `DISCORD_BOT_TOKEN`   | always            | The bot token from the Developer Portal.                                                                 |
-| `TEST_SERVER_ID`      | `commands:dev`    | ID of your test server (enable Developer Mode in Discord, then right-click the server → Copy Server ID). |
-| `DATABASE_URL`        | local dev         | Postgres connection URL. In Docker it is built from the `POSTGRES_*` values and this line is ignored.    |
-| `SHADOW_DATABASE_URL` | `db:migrate` only | Scratch database Prisma uses while creating migrations. Local development only.                          |
-| `POSTGRES_USER`       | Docker            | Database user. Default `railcore`.                                                                       |
-| `POSTGRES_PASSWORD`   | Docker            | Database password. Use letters and digits only, because it becomes part of a URL. **Change it.**         |
-| `POSTGRES_DB`         | Docker            | Database name. Default `railcore`.                                                                       |
-| `LOG_LEVEL`           | optional          | `fatal`, `error`, `warn`, `info` (default), `debug` or `trace`.                                          |
-| `NODE_ENV`            | set by Docker     | `production` switches logs to JSON. Leave it unset locally for readable, colored logs.                   |
+| Variable            | Needed for     | What it is                                                                                               |
+| ------------------- | -------------- | -------------------------------------------------------------------------------------------------------- |
+| `DISCORD_BOT_TOKEN` | always         | The bot token from the Developer Portal.                                                                 |
+| `TEST_SERVER_ID`    | `commands:dev` | ID of your test server (enable Developer Mode in Discord, then right-click the server → Copy Server ID). |
+| `DATABASE_URL`      | local dev      | Postgres connection URL. In Docker it is built from the `POSTGRES_*` values and this line is ignored.    |
+| `POSTGRES_USER`     | Docker         | Database user. Default `railcore`.                                                                       |
+| `POSTGRES_PASSWORD` | Docker         | Database password. Use letters and digits only, because it becomes part of a URL. **Change it.**         |
+| `POSTGRES_DB`       | Docker         | Database name. Default `railcore`.                                                                       |
+| `LOG_LEVEL`         | optional       | `fatal`, `error`, `warn`, `info` (default), `debug` or `trace`.                                          |
+| `NODE_ENV`          | set by Docker  | `production` switches logs to JSON. Leave it unset locally for readable, colored logs.                   |
 
 ## 3. Register the slash commands
 
@@ -154,7 +153,8 @@ Use your own `POSTGRES_USER` / `POSTGRES_DB` if you changed them.
 | `npm start`               | Run the compiled bot from `dist/`                                      |
 | `npm run commands:dev`    | Register slash commands on the test server (`-- --clear` removes them) |
 | `npm run commands:global` | Register slash commands globally                                       |
-| `npm run db:dev`          | Start the local Prisma Dev database                                    |
+| `npm run db:dev`          | Start the local PostgreSQL in the background                           |
+| `npm run db:stop`         | Stop the local PostgreSQL                                              |
 | `npm run db:migrate`      | Create and apply a migration after changing `prisma/schema.prisma`     |
 | `npm run db:deploy`       | Apply existing migrations without creating new ones                    |
 | `npm run typecheck`       | TypeScript check                                                       |
@@ -193,14 +193,14 @@ prisma/
 
 ## Troubleshooting
 
-| Symptom                                                                                | Fix                                                                                                                                                  |
-| -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Startup failed` with `Used disallowed intents`                                        | Turn on both privileged intents (step 1.3).                                                                                                          |
-| `Startup failed` with `Can't reach database server` or `Connection terminated` (local) | The local Prisma Dev database stopped or froze. Run `npx prisma dev stop railcore`, wait about 15 seconds, then `npm run db:dev`. Your data is kept. |
-| Users see "I'm missing a permission to do that"                                        | Check the bot's role position and its permissions in that channel. Picking a channel again in `/setup` tells you which permissions are missing.      |
-| A command is missing                                                                   | Register the commands again (section 3).                                                                                                             |
-| Commands show up twice                                                                 | Registered on the test server and globally: run `npm run commands:dev -- --clear`.                                                                   |
-| Users see "Something went off the rails … Reference: `abc123`"                         | Search the logs for `"ref":"abc123"` (or `ref: "abc123"` locally) to find the full error.                                                            |
+| Symptom                                                                                | Fix                                                                                                                                             |
+| -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Startup failed` with `Used disallowed intents`                                        | Turn on both privileged intents (step 1.3).                                                                                                     |
+| `Startup failed` with `Can't reach database server` or `Connection terminated` (local) | The local database isn't running. Run `npm run db:dev`; if it still fails, look at `.dev-db/postgres.log`.                                      |
+| Users see "I'm missing a permission to do that"                                        | Check the bot's role position and its permissions in that channel. Picking a channel again in `/setup` tells you which permissions are missing. |
+| A command is missing                                                                   | Register the commands again (section 3).                                                                                                        |
+| Commands show up twice                                                                 | Registered on the test server and globally: run `npm run commands:dev -- --clear`.                                                              |
+| Users see "Something went off the rails … Reference: `abc123`"                         | Search the logs for `"ref":"abc123"` (or `ref: "abc123"` locally) to find the full error.                                                       |
 
 ## Known limitations
 

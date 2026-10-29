@@ -1,20 +1,28 @@
 import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import type {
-  AnySelectMenuInteraction,
-  ButtonInteraction,
-  ChatInputCommandInteraction,
-  Client,
-  ClientEvents,
-  ModalSubmitInteraction,
-  RESTPostAPIChatInputApplicationCommandsJSONBody,
+import {
+  ApplicationCommandType,
+  type AnySelectMenuInteraction,
+  type ButtonInteraction,
+  type ChatInputCommandInteraction,
+  type Client,
+  type ClientEvents,
+  type MessageContextMenuCommandInteraction,
+  type ModalSubmitInteraction,
+  type RESTPostAPIApplicationCommandsJSONBody,
+  type UserContextMenuCommandInteraction,
 } from 'discord.js';
 import { logger } from './utils/logger.js';
 
-export interface Command {
-  data: { name: string; toJSON(): RESTPostAPIChatInputApplicationCommandsJSONBody };
-  execute(interaction: ChatInputCommandInteraction<'cached'>): Promise<unknown>;
+type CommandInteraction =
+  | ChatInputCommandInteraction<'cached'>
+  | UserContextMenuCommandInteraction<'cached'>
+  | MessageContextMenuCommandInteraction<'cached'>;
+
+export interface Command<I extends CommandInteraction = CommandInteraction> {
+  data: { name: string; toJSON(): RESTPostAPIApplicationCommandsJSONBody };
+  execute(interaction: I): Promise<unknown>;
 }
 
 export interface Event<K extends keyof ClientEvents = keyof ClientEvents> {
@@ -38,13 +46,22 @@ export interface Component<K extends ComponentKind = ComponentKind> {
   execute(interaction: ComponentInteractions[K], args: string[]): Promise<unknown>;
 }
 
-export const defineCommand = (command: Command) => command;
+export const defineCommand = (command: Command<ChatInputCommandInteraction<'cached'>>) => command;
+/** Right-click a user → Apps. */
+export const defineUserCommand = (command: Command<UserContextMenuCommandInteraction<'cached'>>) =>
+  command;
+/** Right-click a message → Apps. */
+export const defineMessageCommand = (
+  command: Command<MessageContextMenuCommandInteraction<'cached'>>,
+) => command;
 export const defineEvent = <K extends keyof ClientEvents>(event: Event<K>) => event;
 export const defineComponent = <K extends ComponentKind>(component: Component<K>) => component;
 
 export const commands = new Map<string, Command>();
 export const components = new Map<string, Component>();
 export const componentKey = (kind: ComponentKind, id: string) => `${kind}:${id}`;
+// A slash command and a context menu command may share a name, so the type is part of the key.
+export const commandKey = (type: ApplicationCommandType, name: string) => `${type}:${name}`;
 
 async function importDefaults<T>(folder: string): Promise<T[]> {
   const dir = join(import.meta.dirname, folder);
@@ -61,8 +78,10 @@ async function importDefaults<T>(folder: string): Promise<T[]> {
 
 export async function loadCommands(): Promise<Map<string, Command>> {
   for (const command of await importDefaults<Command>('commands')) {
-    if (commands.has(command.data.name)) throw new Error(`Duplicate command: ${command.data.name}`);
-    commands.set(command.data.name, command);
+    const type = command.data.toJSON().type ?? ApplicationCommandType.ChatInput;
+    const key = commandKey(type, command.data.name);
+    if (commands.has(key)) throw new Error(`Duplicate command: ${key}`);
+    commands.set(key, command);
   }
   return commands;
 }

@@ -14,8 +14,10 @@ import {
   time,
   TimestampStyles,
   type BaseMessageOptions,
+  type CategoryChannel,
   type Guild,
   type GuildMember,
+  type Message,
   type MessageCreateOptions,
   type TextChannel,
   type User,
@@ -28,7 +30,8 @@ import {
   type TicketType,
 } from '../generated/prisma/client.js';
 import { t } from '../text.js';
-import { embeds, userLine } from '../utils/embeds.js';
+import { createCooldown } from '../utils/cooldown.js';
+import { clip, embeds, userLine } from '../utils/embeds.js';
 import { UserError } from '../utils/errors.js';
 import { sendDm } from './dm.js';
 import { getConfig } from './guildConfig.js';
@@ -36,7 +39,7 @@ import { sendLog } from './logs.js';
 import { fetchAllMessages, renderTranscript, toTranscriptMessage } from './transcript.js';
 
 export type Answer = { label: string; value: string };
-type Question = { id: string; long?: boolean; max: number };
+type Question = { id: string; long?: boolean; optional?: boolean; max: number };
 type QuestionIds = { [K in TicketType]: keyof (typeof t.tickets.questions)[K] };
 
 const QUESTIONS: { [K in TicketType]: (Question & { id: QuestionIds[K] })[] } = {
@@ -58,9 +61,15 @@ const QUESTIONS: { [K in TicketType]: (Question & { id: QuestionIds[K] })[] } = 
     { id: 'experience', long: true, max: 1000 },
     { id: 'why', long: true, max: 1000 },
   ],
+  // Opened from a message's context menu, not the panel.
+  REPORT: [{ id: 'details', long: true, optional: true, max: 1000 }],
 };
 
-const BUTTON_STYLES: Record<TicketType, ButtonStyle> = {
+/** The types members can open from the ticket panel. */
+const PANEL_TYPES = ['SUPPORT', 'BUG_REPORT', 'APPLICATION'] as const satisfies TicketType[];
+type PanelType = (typeof PANEL_TYPES)[number];
+
+const BUTTON_STYLES: Record<PanelType, ButtonStyle> = {
   SUPPORT: ButtonStyle.Primary,
   BUG_REPORT: ButtonStyle.Secondary,
   APPLICATION: ButtonStyle.Success,
@@ -82,11 +91,11 @@ const questionsOf = (type: TicketType): Question[] => QUESTIONS[type];
 const questionText = (type: TicketType, id: string) =>
   (t.tickets.questions[type] as Record<string, { label: string; placeholder: string }>)[id]!;
 
-export const isTicketType = (value: string | undefined): value is TicketType =>
-  value !== undefined && Object.hasOwn(QUESTIONS, value);
+export const isPanelType = (value: string | undefined): value is PanelType =>
+  (PANEL_TYPES as readonly string[]).includes(value ?? '');
 
 export function ticketPanel(): BaseMessageOptions {
-  const buttons = (Object.keys(QUESTIONS) as TicketType[]).map((type) =>
+  const buttons = PANEL_TYPES.map((type) =>
     new ButtonBuilder()
       .setCustomId(`ticket:open:${type}`)
       .setLabel(t.tickets.types[type].label)
@@ -99,9 +108,9 @@ export function ticketPanel(): BaseMessageOptions {
   };
 }
 
-export function ticketModal(type: TicketType): ModalBuilder {
+export function ticketModal(type: TicketType, customId = `ticket:create:${type}`): ModalBuilder {
   return new ModalBuilder()
-    .setCustomId(`ticket:create:${type}`)
+    .setCustomId(customId)
     .setTitle(t.tickets.types[type].title)
     .addLabelComponents(
       questionsOf(type).map((question) => {
@@ -112,10 +121,52 @@ export function ticketModal(type: TicketType): ModalBuilder {
             .setStyle(question.long ? TextInputStyle.Paragraph : TextInputStyle.Short)
             .setPlaceholder(text.placeholder)
             .setMaxLength(question.max)
-            .setRequired(true),
+            .setRequired(!question.optional),
         );
       }),
     );
+}
+
+type ReportEvidence = { authorId: string; answers: Answer[] };
+
+/** Copies a reported message into ticket answers, so later edits or deletes can't change the evidence. */
+export function reportEvidence(message: Message): ReportEvidence {
+  const answers: Answer[] = [
+    { label: t.tickets.reportAuthor, value: userLine(message.author.id) },
+    { label: t.tickets.reportMessage, value: clip(message.content, 1024) || t.serverLog.noText },
+    { label: t.tickets.reportLink, value: `[${t.tickets.reportJump}](${message.url})` },
+  ];
+  if (message.attachments.size) {
+    const files = [...message.attachments.values()].map((file) => `[${file.name}](${file.url})`);
+    answers.push({ label: t.tickets.reportAttachments, value: clip(files.join('\n'), 1024) });
+  }
+  return { authorId: message.author.id, answers };
+}
+
+// ponytail: snapshots live in memory for 15 minutes (Discord's modal lifetime); a bot restart while
+// a report form is open means the member has to report again.
+const reportSnapshots = new Map<string, { reporterId: string; evidence: ReportEvidence }>();
+
+/** Taken at right-click, because the author may edit or delete the message while the reporter types. */
+export function saveReportSnapshot(
+  key: string,
+  reporterId: string,
+  evidence: ReportEvidence,
+): void {
+  reportSnapshots.set(key, { reporterId, evidence });
+  setTimeout(() => reportSnapshots.delete(key), 15 * 60_000).unref();
+}
+
+/**
+ * The key comes from the modal's custom ID, so it's untrusted: a snapshot only counts for the member
+ * who took it. There is deliberately no fallback that fetches a message by ID, because that would
+ * let a forged custom ID copy messages the reporter can't read.
+ */
+export function takeReportSnapshot(key: string, reporterId: string): ReportEvidence {
+  const snapshot = reportSnapshots.get(key);
+  if (snapshot?.reporterId !== reporterId) throw new UserError(t.tickets.reportExpired);
+  reportSnapshots.delete(key);
+  return snapshot.evidence;
 }
 
 export function readAnswers(type: TicketType, value: (id: string) => string): Answer[] {
@@ -193,10 +244,19 @@ async function findOpenTicket(guild: Guild, userId: string, type: TicketType) {
   return null;
 }
 
+// Every new ticket pings staff, so stop open-close-open loops.
+const opened = createCooldown(60_000);
+const cooldownError = (wait: number) =>
+  new UserError(
+    t.tickets.cooldown(time(new Date(Date.now() + wait), TimestampStyles.RelativeTime)),
+  );
+
 /** Throws a UserError if this member can't open a ticket of this type right now. */
 export async function assertCanOpen(member: GuildMember, type: TicketType) {
   const setup = ticketSetup(member.guild, await getConfig(member.guild.id));
   if (!setup) throw new UserError(t.tickets.notConfigured);
+  const wait = opened.peek(`${member.guild.id}:${member.id}`);
+  if (wait) throw cooldownError(wait);
   const existing = await findOpenTicket(member.guild, member.id, type);
   if (existing) {
     const channel = existing.channelId ? `<#${existing.channelId}>` : undefined;
@@ -205,13 +265,42 @@ export async function assertCanOpen(member: GuildMember, type: TicketType) {
   return setup;
 }
 
+/** `hideFrom` keeps one member out even if they hold a staff role, e.g. the author of a reported message. */
 export async function openTicket(
   member: GuildMember,
   type: TicketType,
   answers: Answer[],
+  hideFrom?: string,
 ): Promise<TextChannel> {
   const { guild } = member;
   const { category, staffRoleIds } = await assertCanOpen(member, type);
+  const cooldownKey = `${guild.id}:${member.id}`;
+  const wait = opened.take(cooldownKey);
+  if (wait) throw cooldownError(wait);
+  try {
+    return await createTicket(member, type, answers, category, staffRoleIds, hideFrom);
+  } catch (err) {
+    opened.clear(cooldownKey); // nothing was opened, so nothing pinged staff
+    throw err;
+  }
+}
+
+async function createTicket(
+  member: GuildMember,
+  type: TicketType,
+  answers: Answer[],
+  category: CategoryChannel,
+  staffRoleIds: string[],
+  hideFrom?: string,
+): Promise<TextChannel> {
+  const { guild } = member;
+  const hidden =
+    hideFrom &&
+    hideFrom !== member.id &&
+    hideFrom !== guild.client.user.id &&
+    guild.members.cache.has(hideFrom)
+      ? [{ id: hideFrom, type: OverwriteType.Member, deny: [PermissionFlagsBits.ViewChannel] }]
+      : [];
   const { ticketCounter: number } = await prisma.guildConfig.update({
     where: { guildId: guild.id },
     data: { ticketCounter: { increment: 1 } },
@@ -260,6 +349,7 @@ export async function openTicket(
           type: OverwriteType.Member,
           allow: [...ACCESS, PermissionFlagsBits.ManageChannels],
         },
+        ...hidden,
       ],
     });
   } catch (err) {
@@ -283,10 +373,7 @@ function openingMessage(
   const { title } = t.tickets.types[ticket.type];
   const answers = ticket.answers as Answer[];
   const embed = embeds
-    .info(
-      `${title} #${pad(ticket.number)}`,
-      ticket.type === 'APPLICATION' ? t.tickets.applicationIntro : t.tickets.intro,
-    )
+    .info(`${title} #${pad(ticket.number)}`, t.tickets.types[ticket.type].intro)
     .setThumbnail(opener.displayAvatarURL())
     .addFields(
       { name: t.tickets.openedBy, value: userLine(opener.id) },

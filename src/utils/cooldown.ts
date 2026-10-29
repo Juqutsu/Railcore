@@ -12,5 +12,13 @@ export function createCooldown(ms: number) {
       until.set(key, now + ms);
       return 0;
     },
+    /** The ms left, without starting a cooldown. */
+    peek(key: string, now = Date.now()): number {
+      return Math.max(0, (until.get(key) ?? 0) - now);
+    },
+    /** Gives the key its turn back, e.g. when the action it guarded failed. */
+    clear(key: string): void {
+      until.delete(key);
+    },
   };
 }

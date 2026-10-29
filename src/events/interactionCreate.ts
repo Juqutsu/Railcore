@@ -1,5 +1,6 @@
 import { Events } from 'discord.js';
 import {
+  commandKey,
   commands,
   componentKey,
   components,
@@ -16,8 +17,12 @@ export default defineEvent({
     if (!interaction.inCachedGuild()) return;
 
     try {
-      if (interaction.isChatInputCommand()) {
-        const command = commands.get(interaction.commandName);
+      if (
+        interaction.isChatInputCommand() ||
+        interaction.isUserContextMenuCommand() ||
+        interaction.isMessageContextMenuCommand()
+      ) {
+        const command = commands.get(commandKey(interaction.commandType, interaction.commandName));
         if (!command) throw new UserError(t.errors.unknownInteraction);
         await command.execute(interaction);
       } else if (interaction.isMessageComponent() || interaction.isModalSubmit()) {
