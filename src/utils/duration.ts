@@ -1,11 +1,11 @@
 import { t } from '../text.js';
 
-/** Parses a whole number of days from 0 to `max`, or returns null. */
-export function parseDays(input: string, max = 365): number | null {
+/** Parses a whole number from 0 to `max`, or returns null. */
+export function parseWholeNumber(input: string, max: number): number | null {
   const trimmed = input.trim();
-  if (!/^\d{1,4}$/.test(trimmed)) return null;
-  const days = Number(trimmed);
-  return days <= max ? days : null;
+  if (!/^\d{1,6}$/.test(trimmed)) return null;
+  const value = Number(trimmed);
+  return value <= max ? value : null;
 }
 
 const UNIT_MS = { w: 604_800_000, d: 86_400_000, h: 3_600_000, m: 60_000, s: 1_000 } as const;

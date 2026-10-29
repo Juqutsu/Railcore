@@ -22,6 +22,10 @@ model GuildConfig {
   serverLogChannelId    String?
   ticketCounter         Int      @default(0)
   caseCounter           Int      @default(0)
+  /// Hours of silence (after staff spoke last) before the opener is reminded; 0 = off.
+  ticketReminderHours   Int      @default(24)
+  /// Hours after the reminder until the ticket closes itself; 0 = never.
+  ticketAutoCloseHours  Int      @default(24)
   updatedAt             DateTime @updatedAt
 }
 
@@ -73,6 +77,9 @@ model Ticket {
   reviewedById String?
   reviewReason String?
   reviewedAt   DateTime?
+  /// The inactivity reminder, while it is still the latest message in the channel.
+  reminderMessageId String?
+  remindedAt   DateTime?
   createdAt    DateTime           @default(now())
   closedAt     DateTime?
 

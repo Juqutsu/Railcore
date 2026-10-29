@@ -24,6 +24,9 @@ export const t = {
     setup: 'Configure Railcore for this server',
     verifyPanel: 'Post the verification panel in the verification channel',
     ticketPanel: 'Post the ticket panel in this channel',
+    ticket: 'Manage who can see this ticket',
+    ticketAdd: 'Give a member access to this ticket',
+    ticketRemove: "Remove a member's access to this ticket",
     warn: 'Warn a member',
     warnings: "Show a member's active warnings",
     clearwarn: 'Clear one or all warnings of a member',
@@ -53,6 +56,7 @@ export const t = {
     amount: 'How many recent messages to check (1–100)',
     purgeUser: 'Only delete messages from this user',
     userId: 'ID of the banned user',
+    ticketUser: 'The member',
   },
 
   time: {
@@ -179,6 +183,19 @@ export const t = {
     },
     reportAuthor: 'Author',
     reportMessage: 'Reported message',
+    notInTicket: 'Use this inside an open ticket channel.',
+    cantChangeOpener: 'The person who opened the ticket always keeps access.',
+    cantChangeBot: 'I need to stay in the ticket.',
+    cantRemoveStaff:
+      'Staff always see tickets. To keep someone out, remove their staff role first.',
+    userAdded: (user: string, by: string) => `${user} was added to this ticket by ${by}.`,
+    userRemoved: (user: string, by: string) => `${user} was removed from this ticket by ${by}.`,
+    auditAccess: (by: string) => `Ticket access changed by ${by}`,
+    reminderTitle: 'Still need help?',
+    reminder: 'Is there anything else we can help with? Just reply here.',
+    reminderWithClose: (when: string) =>
+      `Is there anything else we can help with? Just reply here, otherwise this ticket closes ${when}.`,
+    autoCloseReason: 'Closed automatically after no reply',
     reportLink: 'Link',
     reportJump: 'Jump to message',
     reportAttachments: 'Attachments',
@@ -271,6 +288,7 @@ export const t = {
     openedBy: 'Opened by',
     messages: (n: number) => `${n} message${n === 1 ? '' : 's'}`,
     bot: 'BOT',
+    linkMayExpire: 'link may expire',
   },
 
   serverLog: {
@@ -428,10 +446,10 @@ export const t = {
     cleared: (label: string) => `✅ Cleared **${label}**.`,
     savedMissingPerms: (label: string, channel: string, perms: string) =>
       `⚠️ Saved **${label}**, but I'm missing **${perms}** in ${channel}. Fix that, or I can't work there.`,
-    ageModalTitle: 'Minimum account age',
-    ageLabel: 'Days',
-    ageHint: 'Whole number from 0 to 365. 0 turns the check off.',
-    invalidAge: 'Enter a whole number of days from 0 to 365.',
+    hours: (n: number) => (n === 0 ? 'Off' : `${n} hour${n === 1 ? '' : 's'}`),
+    units: { days: 'Days', hours: 'Hours' },
+    numberHint: (max: number) => `Whole number from 0 to ${max}. 0 turns it off.`,
+    invalidNumber: (max: number) => `Enter a whole number from 0 to ${max}.`,
     settings: {
       verificationChannelId: {
         label: 'Verification channel',
@@ -460,6 +478,14 @@ export const t = {
       applicationRoleId: {
         label: 'Application role',
         description: 'Given when a staff application is accepted.',
+      },
+      ticketReminderHours: {
+        label: 'Ticket reminder',
+        description: 'Hours without a reply to staff before the opener is reminded.',
+      },
+      ticketAutoCloseHours: {
+        label: 'Ticket auto-close',
+        description: 'Hours after the reminder until the ticket closes itself.',
       },
       modLogChannelId: {
         label: 'Mod log channel',

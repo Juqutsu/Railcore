@@ -19,6 +19,7 @@ import {
   type GuildMember,
   type Message,
   type MessageCreateOptions,
+  type PermissionsString,
   type TextChannel,
   type User,
 } from 'discord.js';
@@ -36,7 +37,12 @@ import { UserError } from '../utils/errors.js';
 import { sendDm } from './dm.js';
 import { getConfig } from './guildConfig.js';
 import { sendLog } from './logs.js';
-import { fetchAllMessages, renderTranscript, toTranscriptMessage } from './transcript.js';
+import {
+  fetchAllMessages,
+  inlineAttachments,
+  renderTranscript,
+  toTranscriptMessage,
+} from './transcript.js';
 
 export type Answer = { label: string; value: string };
 type Question = { id: string; long?: boolean; optional?: boolean; max: number };
@@ -76,13 +82,27 @@ const BUTTON_STYLES: Record<PanelType, ButtonStyle> = {
 };
 
 /** What opener and staff may do in a ticket channel. */
-const ACCESS = [
-  PermissionFlagsBits.ViewChannel,
-  PermissionFlagsBits.SendMessages,
-  PermissionFlagsBits.ReadMessageHistory,
-  PermissionFlagsBits.AttachFiles,
-  PermissionFlagsBits.EmbedLinks,
+const ACCESS: PermissionsString[] = [
+  'ViewChannel',
+  'SendMessages',
+  'ReadMessageHistory',
+  'AttachFiles',
+  'EmbedLinks',
 ];
+
+/** Lets a member into a ticket, or keeps them out. A member-level deny also beats staff roles. */
+export async function setTicketAccess(
+  channel: TextChannel,
+  userId: string,
+  allowed: boolean,
+  reason: string,
+): Promise<void> {
+  const permissions = allowed ? ACCESS : (['ViewChannel'] as PermissionsString[]);
+  const options = Object.fromEntries(permissions.map((name) => [name, allowed]));
+  await channel.permissionOverwrites.create(userId, options, {
+    reason,
+  });
+}
 
 export const pad = (n: number) => String(n).padStart(4, '0');
 const openKey = (guildId: string, userId: string, type: TicketType) =>
@@ -347,7 +367,7 @@ async function createTicket(
         {
           id: guild.client.user.id,
           type: OverwriteType.Member,
-          allow: [...ACCESS, PermissionFlagsBits.ManageChannels],
+          allow: [...ACCESS, 'ManageChannels'],
         },
         ...hidden,
       ],
@@ -490,24 +510,33 @@ export async function closeTicket(
     const messages = await fetchAllMessages(channel);
     const opener = await guild.client.users.fetch(ticket.openerId).catch(() => null);
     const closedAt = new Date();
-    const html = renderTranscript(
-      {
-        title: `${title} #${number}`,
-        guildName: guild.name,
-        openedBy: opener?.username ?? ticket.openerId,
-        openedAt: ticket.createdAt,
-        closedAt,
-      },
-      messages.map(toTranscriptMessage),
-    );
+    const transcriptMessages = messages.map(toTranscriptMessage);
+    await inlineAttachments(transcriptMessages);
+    const meta = {
+      title: `${title} #${number}`,
+      guildName: guild.name,
+      openedBy: opener?.username ?? ticket.openerId,
+      openedAt: ticket.createdAt,
+      closedAt,
+    };
+    let html = renderTranscript(meta, transcriptMessages);
     const transcript = () =>
       new AttachmentBuilder(Buffer.from(html, 'utf8'), { name: `${channel.name}.html` });
+    const postLog = () =>
+      sendLog(guild, 'ticketLogChannelId', {
+        embeds: [closedLogEmbed(ticket, closer, reason, messages.length)],
+        files: [transcript()],
+      });
 
     // Until the transcript is in the log, this channel is the only copy, so keep it on failure.
-    const logged = await sendLog(guild, 'ticketLogChannelId', {
-      embeds: [closedLogEmbed(ticket, closer, reason, messages.length)],
-      files: [transcript()],
-    });
+    let logged = await postLog();
+    const files = transcriptMessages.flatMap((message) => message.attachments);
+    if (!logged && files.some((file) => file.dataUri)) {
+      // Most likely over Discord's upload limit: try once more with the files as plain links.
+      for (const file of files) file.dataUri = undefined;
+      html = renderTranscript(meta, transcriptMessages);
+      logged = await postLog();
+    }
     if (!logged) throw new UserError(t.tickets.transcriptNotSaved);
 
     await prisma.ticket.update({

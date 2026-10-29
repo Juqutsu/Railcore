@@ -8,7 +8,7 @@ export default defineComponent({
   kind: 'button',
   id: 'setup:clear',
   async execute(interaction, [key]) {
-    if (!isSettingKey(key) || SETTINGS[key].kind === 'days') {
+    if (!isSettingKey(key) || SETTINGS[key].kind === 'number') {
       throw new UserError(t.errors.unknownInteraction);
     }
     const config = await updateConfig(interaction.guildId, {

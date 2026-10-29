@@ -3,8 +3,9 @@
 The Discord bot for **Falkenberg Railways**, a Roblox railway simulator.
 
 - **Verification**: a rules panel with a Verify button. It checks the account age against a minimum, has an anti-spam cooldown and alerts staff about new accounts. Verification lives in its own module, so a Roblox account link can be added later.
-- **Tickets and staff applications**: Support, Bug Report and Staff Application tickets in private channels, with Claim and Close buttons. Applications get Accept / Deny buttons. Closed tickets produce an HTML transcript, which goes to a log channel and to the member by DM.
+- **Tickets and staff applications**: Support, Bug Report and Staff Application tickets in private channels, with Claim and Close buttons. Applications get Accept / Deny buttons. Staff can add or remove people with `/ticket add` and `/ticket remove`. When the opener stops answering staff, the bot reminds them, then closes the ticket if it stays quiet. Closed tickets produce an HTML transcript with the images and files embedded, which goes to a log channel and to the member by DM.
 - **Moderation**: `/warn`, `/warnings`, `/clearwarn`, `/timeout`, `/untimeout`, `/kick`, `/ban`, `/unban` and `/purge`. Every action becomes a numbered case, the member gets a DM, and the action is posted to the mod log. Staff can't moderate equal or higher roles.
+- **Right-click menu** (Apps): on a member, Warn, Timeout and Show warnings; on a message, Report message, which opens a private report ticket with a copy of the message.
 - **Server log**: message edits and deletions, members joining and leaving, role changes and nickname changes.
 - **Configuration**: everything is set up in Discord with `/setup`, so no IDs live in the code.
 
@@ -73,7 +74,7 @@ If commands are registered both on the test server and globally, they show up tw
 
 1. Run **`/setup`** and set each item from the menu:
    - **Verification**: verification channel, Verified role, minimum account age (default 7 days, `0` turns the check off).
-   - **Tickets & applications**: ticket category, ticket log channel, staff roles, and the application role that accepted applicants get.
+   - **Tickets & applications**: ticket category, ticket log channel, staff roles, the application role that accepted applicants get, and the reminder and auto-close times for quiet tickets (default 24 hours each, `0` turns them off).
    - **Logs**: mod log channel and server log channel.
 
    The dashboard warns you when the bot is missing permissions in a channel you pick.
@@ -87,7 +88,8 @@ If commands are registered both on the test server and globally, they show up tw
 - `/setup`, `/verify-panel`, `/ticket-panel`: **Manage Server**
 - `/warn`, `/warnings`, `/clearwarn`, `/timeout`, `/untimeout`: **Moderate Members**
 - `/kick`: **Kick Members** · `/ban`, `/unban`: **Ban Members** · `/purge`: **Manage Messages**
-- Claiming tickets and reviewing applications: the **staff roles** from `/setup`. Administrators always count as staff.
+- Right-click Warn, Timeout, Show warnings: **Moderate Members** · Report message: everyone
+- Claiming tickets, reviewing applications, `/ticket add` and `/ticket remove`: the **staff roles** from `/setup`. Administrators always count as staff.
 
 You can change who sees each command per role or member in **Server Settings → Integrations → Railcore**. The role hierarchy still applies: nobody can moderate themselves, the owner, the bot, or someone with an equal or higher role.
 
@@ -207,4 +209,4 @@ prisma/
 - **Single bot process**: the settings cache and the ticket-close lock live in memory. Don't run two copies of the bot against the same database.
 - **Server log content**: Discord only sends a message's old text if the bot had it cached. The cache covers messages sent since the last start, up to the last 200 per channel. Edits of older messages show the old text as "Unknown", and deletions of older messages aren't logged.
 - **No "changed by" in the server log**: role and nickname changes don't say who made them. That would need audit-log lookups.
-- **Attachment links in transcripts**: they point to Discord's CDN, which expires links after about a day. The text is kept for good; images and files are not.
+- **Files in transcripts**: up to 4 MB of images and files per ticket are embedded in the transcript, so the HTML stays under Discord's upload limit. Anything beyond that stays a Discord link, which expires after about a day, and is marked as such. If the upload still fails, the bot retries once with all files as links.

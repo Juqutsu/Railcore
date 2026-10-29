@@ -1,15 +1,18 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { formatDuration, parseDays, parseDuration } from './duration.js';
+import { formatDuration, parseDuration, parseWholeNumber } from './duration.js';
 
-void test('parseDays accepts whole days in range', () => {
-  assert.equal(parseDays('7'), 7);
-  assert.equal(parseDays(' 0 '), 0);
-  assert.equal(parseDays('365'), 365);
+void test('parseWholeNumber accepts whole numbers in range', () => {
+  assert.equal(parseWholeNumber('7', 365), 7);
+  assert.equal(parseWholeNumber(' 0 ', 365), 0);
+  assert.equal(parseWholeNumber('365', 365), 365);
+  assert.equal(parseWholeNumber('720', 720), 720);
 });
 
-void test('parseDays rejects everything else', () => {
-  for (const input of ['366', '-1', '1.5', 'abc', '', '7d']) assert.equal(parseDays(input), null);
+void test('parseWholeNumber rejects everything else', () => {
+  for (const input of ['366', '-1', '1.5', 'abc', '', '7d']) {
+    assert.equal(parseWholeNumber(input, 365), null, input);
+  }
 });
 
 void test('parseDuration reads single and combined units', () => {

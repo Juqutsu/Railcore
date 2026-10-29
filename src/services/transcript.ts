@@ -8,7 +8,14 @@ export type TranscriptMessage = {
   createdAt: Date;
   content: string;
   embeds: { title?: string; description?: string; fields: { name: string; value: string }[] }[];
-  attachments: { name: string; url: string }[];
+  attachments: {
+    name: string;
+    url: string;
+    contentType: string | null;
+    size: number;
+    /** Set by inlineAttachments when the file was downloaded into the transcript. */
+    dataUri?: string;
+  }[];
 };
 
 export type TranscriptMeta = {
@@ -59,8 +66,41 @@ export function toTranscriptMessage(message: Message): TranscriptMessage {
     attachments: [...message.attachments.values()].map((file) => ({
       name: file.name,
       url: file.url,
+      contentType: file.contentType,
+      size: file.size,
     })),
   };
+}
+
+const SAFE_TYPE = /^[\w.+-]+\/[\w.+-]+$/;
+
+/** Inlines a file as a data URI; an odd content type falls back to a plain download. */
+export const dataUri = (contentType: string | null, bytes: Buffer) =>
+  `data:${contentType && SAFE_TYPE.test(contentType) ? contentType : 'application/octet-stream'};base64,${bytes.toString('base64')}`;
+
+/**
+ * Downloads attachments into the transcript, because Discord's file links expire after about a day.
+ * Files that don't fit the budget or fail to download stay plain links.
+ */
+// ponytail: 4 MB of files (about 5.3 MB as base64) keeps the HTML under Discord's upload limit; bigger
+// tickets would need the files stored elsewhere (e.g. on the VPS).
+export async function inlineAttachments(
+  messages: TranscriptMessage[],
+  budget = 4_000_000,
+): Promise<void> {
+  let left = budget;
+  for (const file of messages.flatMap((message) => message.attachments)) {
+    if (file.size > left) continue;
+    try {
+      const response = await fetch(file.url, { signal: AbortSignal.timeout(15_000) });
+      if (!response.ok) continue;
+      const bytes = Buffer.from(await response.arrayBuffer());
+      file.dataUri = dataUri(file.contentType, bytes);
+      left -= bytes.length;
+    } catch {
+      // Network error or timeout: the file stays a link.
+    }
+  }
 }
 
 const escape = (text: string) => text.replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`);
@@ -81,9 +121,18 @@ function renderMessage(message: TranscriptMessage): string {
     )
     .join('');
   const files = message.attachments
-    .map(
-      (file) => `<div class="file"><a href="${escape(file.url)}">📎 ${escape(file.name)}</a></div>`,
-    )
+    .map((file) => {
+      const name = escape(file.name);
+      // Checked on the sanitized data URI, and embedded only once: a download link around the
+      // image would double the file size.
+      if (file.dataUri?.startsWith('data:image/')) {
+        return `<div class="file"><img class="attachment" src="${escape(file.dataUri)}" alt="${name}"></div>`;
+      }
+      if (file.dataUri) {
+        return `<div class="file"><a href="${escape(file.dataUri)}" download="${name}">📎 ${name}</a></div>`;
+      }
+      return `<div class="file"><a href="${escape(file.url)}">📎 ${name}</a> <span class="note">(${escape(t.transcript.linkMayExpire)})</span></div>`;
+    })
     .join('');
   const badge = message.bot ? `<span class="bot">${escape(t.transcript.bot)}</span>` : '';
   const content = message.content ? `<div class="text">${escape(message.content)}</div>` : '';
@@ -128,6 +177,8 @@ time{color:var(--muted);font-size:12px;margin-left:8px}
 .field{margin-top:6px}
 .field b{font-size:13px}
 a{color:var(--brand)}
+.attachment{display:block;max-width:100%;max-height:360px;border-radius:6px;margin-top:6px}
+.note{color:var(--muted);font-size:12px}
 footer{color:var(--muted);font-size:12px;text-align:center;padding:24px 16px}
 </style>
 </head>

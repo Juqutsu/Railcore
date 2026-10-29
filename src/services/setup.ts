@@ -21,14 +21,18 @@ import { POST_PERMISSIONS as POST } from '../utils/permissions.js';
 
 export type SettingKey = keyof typeof t.setup.settings;
 
+type NumberSetting = { kind: 'number'; unit: keyof typeof t.setup.units; max: number };
 type Setting =
   | { kind: 'channel' | 'category'; permissions: PermissionsString[] }
-  | { kind: 'role' | 'roles' | 'days' };
+  | { kind: 'role' | 'roles' }
+  | NumberSetting;
 
 export const SETTINGS: Record<SettingKey, Setting> = {
   verificationChannelId: { kind: 'channel', permissions: POST },
   verifiedRoleId: { kind: 'role' },
-  minAccountAgeDays: { kind: 'days' },
+  minAccountAgeDays: { kind: 'number', unit: 'days', max: 365 },
+  ticketReminderHours: { kind: 'number', unit: 'hours', max: 720 },
+  ticketAutoCloseHours: { kind: 'number', unit: 'hours', max: 720 },
   ticketCategoryId: {
     kind: 'category',
     // Ticket channels grant these to members, and Discord only lets the bot grant what it has.
@@ -45,7 +49,14 @@ const GROUPS: { name: keyof typeof t.setup.groups; keys: SettingKey[] }[] = [
   { name: 'verification', keys: ['verificationChannelId', 'verifiedRoleId', 'minAccountAgeDays'] },
   {
     name: 'tickets',
-    keys: ['ticketCategoryId', 'ticketLogChannelId', 'staffRoleIds', 'applicationRoleId'],
+    keys: [
+      'ticketCategoryId',
+      'ticketLogChannelId',
+      'staffRoleIds',
+      'applicationRoleId',
+      'ticketReminderHours',
+      'ticketAutoCloseHours',
+    ],
   },
   { name: 'logs', keys: ['modLogChannelId', 'serverLogChannelId'] },
 ];
@@ -55,7 +66,8 @@ export const isSettingKey = (key: string | undefined): key is SettingKey =>
 
 function formatValue(config: GuildConfig, key: SettingKey): string {
   const value = config[key];
-  if (typeof value === 'number') return t.setup.days(value);
+  const setting = SETTINGS[key];
+  if (setting.kind === 'number' && typeof value === 'number') return t.setup[setting.unit](value);
   if (Array.isArray(value)) {
     return value.length ? value.map((id) => `<@&${id}>`).join(' ') : t.setup.notSet;
   }
@@ -108,9 +120,9 @@ export function setupEditor(
     .setStyle(ButtonStyle.Secondary);
   const setting = SETTINGS[key];
 
-  if (setting.kind === 'days') {
+  if (setting.kind === 'number') {
     const change = new ButtonBuilder()
-      .setCustomId('setup:age')
+      .setCustomId(`setup:number:${key}`)
       .setLabel(t.setup.change)
       .setStyle(ButtonStyle.Primary);
     return {
@@ -159,20 +171,24 @@ export function setupEditor(
   };
 }
 
-export function ageModal(current: number): ModalBuilder {
+export function numberModal(
+  key: SettingKey,
+  setting: NumberSetting,
+  current: number,
+): ModalBuilder {
   return new ModalBuilder()
-    .setCustomId('setup:age')
-    .setTitle(t.setup.ageModalTitle)
+    .setCustomId(`setup:number:${key}`)
+    .setTitle(t.setup.settings[key].label)
     .addLabelComponents(
       new LabelBuilder()
-        .setLabel(t.setup.ageLabel)
-        .setDescription(t.setup.ageHint)
+        .setLabel(t.setup.units[setting.unit])
+        .setDescription(t.setup.numberHint(setting.max))
         .setTextInputComponent(
           new TextInputBuilder()
-            .setCustomId('days')
+            .setCustomId('value')
             .setStyle(TextInputStyle.Short)
             .setMinLength(1)
-            .setMaxLength(3)
+            .setMaxLength(String(setting.max).length)
             .setValue(String(current)),
         ),
     );
