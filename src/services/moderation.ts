@@ -56,6 +56,13 @@ export function assertCanModerate(moderator: GuildMember, target: GuildMember): 
   }
 }
 
+/** Modals are submitted after Discord's command check, so a moderator demoted meanwhile is caught here. */
+export function assertStillModerator(moderator: GuildMember): void {
+  if (!moderator.permissions.has(PermissionFlagsBits.ModerateMembers)) {
+    throw new UserError(t.errors.noPermission);
+  }
+}
+
 /** `able` is discord.js's kickable / bannable / moderatable, which covers the bot's role and permissions. */
 export function assertBotCan(able: boolean, target: GuildMember): void {
   if (!able) throw new UserError(t.mod.botCannot(target.toString()));

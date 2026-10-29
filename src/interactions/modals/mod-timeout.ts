@@ -2,6 +2,7 @@ import { MessageFlags } from 'discord.js';
 import { defineComponent } from '../../handlers.js';
 import {
   assertCanModerate,
+  assertStillModerator,
   assertTimeoutable,
   fetchMember,
   moderate,
@@ -12,6 +13,8 @@ export default defineComponent({
   kind: 'modal',
   id: 'mod:timeout',
   async execute(interaction, [userId = '']) {
+    // Checked again: permissions and roles may have changed while the modal was open.
+    assertStillModerator(interaction.member);
     const member = await fetchMember(interaction.guild, userId);
     assertCanModerate(interaction.member, member);
     const ms = parseTimeout(interaction.fields.getTextInputValue('duration'));
