@@ -1,4 +1,11 @@
-import { escapeMarkdown, type BaseMessageOptions, type User } from 'discord.js';
+import {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  escapeMarkdown,
+  type BaseMessageOptions,
+  type User,
+} from 'discord.js';
 import { env } from '../env.js';
 import { t } from '../text.js';
 import { embeds } from '../utils/embeds.js';
@@ -9,6 +16,9 @@ import { parseProgress } from '../utils/progress.js';
 // Falkenberg Railways itself; the API key is scoped to this universe.
 const UNIVERSE_ID = '10123051468';
 const PROGRESS_STORE = 'FBR_Progress_v1';
+/** The game's OrderedDataStores; same `u_<userId>` keys, whole-number values. */
+const BOARDS = { xp: 'FBR_Leaderboard_XP_v1', km: 'FBR_Leaderboard_Km_v1' } as const;
+export type Board = keyof typeof BOARDS;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object';
@@ -23,10 +33,10 @@ class HttpError extends Error {
   }
 }
 
-/** GETs JSON with a timeout. 404 gives null; 429 and 5xx are retried twice, honoring retry-after. */
-async function getJson(url: string, headers?: Record<string, string>): Promise<unknown> {
+/** Fetches JSON with a timeout. 404 gives null; 429 and 5xx are retried twice, honoring retry-after. */
+async function getJson(url: string, init: RequestInit = {}): Promise<unknown> {
   for (let attempt = 0; ; attempt++) {
-    const res = await fetch(url, { headers, signal: AbortSignal.timeout(8000) });
+    const res = await fetch(url, { ...init, signal: AbortSignal.timeout(8000) });
     if (res.status === 404) return null;
     if (res.ok) return res.json();
     if ((res.status !== 429 && res.status < 500) || attempt === 2) {
@@ -40,9 +50,20 @@ async function getJson(url: string, headers?: Record<string, string>): Promise<u
   }
 }
 
+/** Turns a failed lookup into the message the member sees, and logs the cause with `context`. */
+function lookupError(err: unknown, context: object): UserError {
+  // A rejected key is a setup mistake that retrying won't fix, so it gets its own message.
+  if (err instanceof HttpError && (err.status === 401 || err.status === 403)) {
+    logger.error({ err, ...context }, 'Game data API key rejected');
+    return new UserError(t.stats.keyRejected(err.host));
+  }
+  logger.warn({ err, ...context }, 'Game data lookup failed');
+  return new UserError(t.stats.unavailable);
+}
+
 /**
- * Remembers each key's result for `ttlMs`, so repeated /stats calls don't hit the APIs every
- * time. null is never kept: someone who links their account or starts playing shows up at once.
+ * Remembers each key's result for `ttlMs`, so repeated calls don't hit the APIs every time.
+ * null is never kept: someone who links their account or starts playing shows up at once.
  */
 function cached<T>(ttlMs: number, load: (key: string) => Promise<T | null>) {
   const entries = new Map<string, { value: T; expires: number }>();
@@ -66,7 +87,7 @@ const linkedRobloxId = cached(5 * 60_000, async (key) => {
   const [guildId, userId] = key.split(':');
   const body = await getJson(
     `https://api.blox.link/v4/public/guilds/${guildId}/discord-to-roblox/${userId}`,
-    { Authorization: env.BLOXLINK_API_KEY ?? '' },
+    { headers: { Authorization: env.BLOXLINK_API_KEY ?? '' } },
   );
   const raw = isRecord(body) ? body.robloxID : undefined;
   const id = typeof raw === 'string' || typeof raw === 'number' ? String(raw) : '';
@@ -78,7 +99,7 @@ const linkedRobloxId = cached(5 * 60_000, async (key) => {
 const progressOf = cached(60_000, async (robloxId) => {
   const body = await getJson(
     `https://apis.roblox.com/cloud/v2/universes/${UNIVERSE_ID}/data-stores/${PROGRESS_STORE}/entries/u_${robloxId}`,
-    { 'x-api-key': env.ROBLOX_API_KEY ?? '' },
+    { headers: { 'x-api-key': env.ROBLOX_API_KEY ?? '' } },
   );
   return isRecord(body) ? parseProgress(body.value) : null;
 });
@@ -100,13 +121,63 @@ const headshotOf = cached(60 * 60_000, async (robloxId) => {
   return typeof first.imageUrl === 'string' && first.imageUrl ? first.imageUrl : null;
 });
 
+/** Display names for many players in one request. Missing ones are left out. */
+async function displayNames(robloxIds: string[]): Promise<Map<string, string>> {
+  const body = await getJson('https://users.roblox.com/v1/users', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ userIds: robloxIds.map(Number), excludeBannedUsers: false }),
+  });
+  const names = new Map<string, string>();
+  for (const user of isRecord(body) && Array.isArray(body.data) ? body.data : []) {
+    if (isRecord(user) && typeof user.displayName === 'string') {
+      names.set(String(user.id), user.displayName);
+    }
+  }
+  return names;
+}
+
+const TOP = 100;
+const PAGE_SIZE = 10;
+
+/** Key is a Board. Its top 100 real players, best first, with their display names. */
+const topOf = cached(60_000, async (board) => {
+  const top: { robloxId: string; value: number }[] = [];
+  let pageToken = '';
+  // A second page only when Studio test profiles (negative IDs) were skipped on the first.
+  for (let request = 0; request < 2 && top.length < TOP; request++) {
+    const body = await getJson(
+      `https://apis.roblox.com/cloud/v2/universes/${UNIVERSE_ID}/ordered-data-stores/${BOARDS[board as Board]}/scopes/global/entries?maxPageSize=${TOP}&orderBy=value%20desc${pageToken && `&pageToken=${encodeURIComponent(pageToken)}`}`,
+      { headers: { 'x-api-key': env.ROBLOX_API_KEY ?? '' } },
+    );
+    if (!isRecord(body)) break;
+    const entries = Array.isArray(body.orderedDataStoreEntries) ? body.orderedDataStoreEntries : [];
+    for (const entry of entries) {
+      if (!isRecord(entry) || typeof entry.value !== 'number' || typeof entry.id !== 'string')
+        continue;
+      const robloxId = /^u_([1-9]\d*)$/.exec(entry.id)?.[1];
+      if (robloxId && top.length < TOP) top.push({ robloxId, value: entry.value });
+    }
+    if (typeof body.nextPageToken !== 'string' || !body.nextPageToken) break;
+    pageToken = body.nextPageToken;
+  }
+  // Names are cosmetic: without them the board still shows, with "Roblox user 123".
+  const names = top.length
+    ? await displayNames(top.map((row) => row.robloxId)).catch(() => new Map<string, string>())
+    : new Map<string, string>();
+  return top.map((row) => ({ ...row, name: names.get(row.robloxId) }));
+});
+
 /** Checked before deferring, so a missing key gets a private reply instead of a public one. */
-export function assertStatsReady(): void {
-  if (!env.ROBLOX_API_KEY || !env.BLOXLINK_API_KEY) throw new UserError(t.stats.notConfigured);
+export function assertGameDataReady(needsBloxlink: boolean): void {
+  if (!env.ROBLOX_API_KEY || (needsBloxlink && !env.BLOXLINK_API_KEY)) {
+    throw new UserError(t.stats.notConfigured);
+  }
 }
 
 const count = (n: number) => n.toLocaleString('en-US');
 const km = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 1 });
+const profileUrl = (robloxId: string) => `https://www.roblox.com/users/${robloxId}/profile`;
 
 export async function statsReply(
   guildId: string,
@@ -119,13 +190,7 @@ export async function statsReply(
     robloxId = await linkedRobloxId(`${guildId}:${user.id}`);
     progress = robloxId ? await progressOf(robloxId) : null;
   } catch (err) {
-    // A rejected key is a setup mistake that retrying won't fix, so it gets its own message.
-    if (err instanceof HttpError && (err.status === 401 || err.status === 403)) {
-      logger.error({ err, userId: user.id }, 'Game stats API key rejected');
-      throw new UserError(t.stats.keyRejected(err.host));
-    }
-    logger.warn({ err, userId: user.id }, 'Game stats lookup failed');
-    throw new UserError(t.stats.unavailable);
+    throw lookupError(err, { userId: user.id });
   }
   if (!robloxId) {
     throw new UserError(self ? t.stats.notLinkedSelf : t.stats.notLinked(user.toString()));
@@ -144,7 +209,7 @@ export async function statsReply(
       title,
       progress ? t.stats.statsFor(user.toString()) : t.stats.neverPlayed(user.toString()),
     )
-    .setURL(`https://www.roblox.com/users/${robloxId}/profile`);
+    .setURL(profileUrl(robloxId));
   if (headshot) embed.setThumbnail(headshot);
   if (progress) {
     embed.addFields(
@@ -156,4 +221,65 @@ export async function statsReply(
     );
   }
   return { embeds: [embed] };
+}
+
+/**
+ * One page of a board. The buttons carry `ownerId`, board and page in their custom IDs, so they
+ * keep working after a restart; see interactions/buttons/lb-page.ts.
+ */
+export async function leaderboardReply(
+  board: Board,
+  page: number,
+  ownerId: string,
+): Promise<BaseMessageOptions> {
+  let top;
+  try {
+    top = (await topOf(board)) ?? [];
+  } catch (err) {
+    throw lookupError(err, { board });
+  }
+  const pages = Math.max(1, Math.ceil(top.length / PAGE_SIZE));
+  const current = Math.min(Math.max(0, Math.trunc(page) || 0), pages - 1);
+  const lines = top.slice(current * PAGE_SIZE, (current + 1) * PAGE_SIZE).map((row, i) => {
+    const name = escapeMarkdown(row.name ?? t.stats.unknownName(row.robloxId));
+    const value =
+      board === 'xp' ? t.leaderboard.xp(count(row.value)) : t.stats.km(count(row.value));
+    return t.leaderboard.line(
+      t.leaderboard.place(current * PAGE_SIZE + i + 1),
+      `[${name}](${profileUrl(row.robloxId)})`,
+      value,
+    );
+  });
+  const embed = embeds.info(
+    t.leaderboard.title(t.leaderboard.by[board]),
+    lines.join('\n') || t.leaderboard.empty,
+  );
+
+  // Custom IDs must be unique within a message, hence the trailing tags on the extra buttons.
+  const id = (target: Board, targetPage: number, tag = '') =>
+    `lb:page:${ownerId}:${target}:${targetPage}${tag && `:${tag}`}`;
+  const button = (customId: string, label: string, style = ButtonStyle.Secondary) =>
+    new ButtonBuilder().setCustomId(customId).setLabel(label).setStyle(style);
+  const rows = [];
+  if (pages > 1) {
+    rows.push(
+      new ActionRowBuilder<ButtonBuilder>().addComponents(
+        button(id(board, current - 1), t.leaderboard.prev).setDisabled(current === 0),
+        button(id(board, current, 'now'), t.leaderboard.page(current + 1, pages)).setDisabled(true),
+        button(id(board, current + 1), t.leaderboard.next).setDisabled(current === pages - 1),
+      ),
+    );
+  }
+  rows.push(
+    new ActionRowBuilder<ButtonBuilder>().addComponents(
+      (Object.keys(BOARDS) as Board[]).map((target) =>
+        button(
+          id(target, 0, 'board'),
+          t.leaderboard.by[target],
+          target === board ? ButtonStyle.Primary : ButtonStyle.Secondary,
+        ).setDisabled(target === board),
+      ),
+    ),
+  );
+  return { embeds: [embed], components: rows };
 }

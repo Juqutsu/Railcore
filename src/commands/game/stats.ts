@@ -1,6 +1,6 @@
 import { InteractionContextType, SlashCommandBuilder } from 'discord.js';
 import { defineCommand } from '../../handlers.js';
-import { assertStatsReady, statsReply } from '../../services/roblox.js';
+import { assertGameDataReady, statsReply } from '../../services/roblox.js';
 import { t } from '../../text.js';
 import { UserError } from '../../utils/errors.js';
 
@@ -14,7 +14,7 @@ export default defineCommand({
   async execute(interaction) {
     const user = interaction.options.getUser('user') ?? interaction.user;
     if (user.bot) throw new UserError(t.stats.bot);
-    assertStatsReady();
+    assertGameDataReady(true);
     // Public on purpose, so members can show off and compare.
     await interaction.deferReply();
     await interaction.editReply(

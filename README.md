@@ -22,17 +22,17 @@ Verification, welcome messages, tickets, staff applications, moderation and logs
 
 ## ✨ Features
 
-|     | Module                 | What it does                                                                                                                                                                                                                                             |
-| --- | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 🎫  | **Verification**       | A rules panel with a Verify button. Checks the Discord account age against a minimum, has an anti-spam cooldown and alerts staff about accounts that are too new. Built as its own module, ready for a Roblox account link.                              |
-| 👋  | **Welcome & leave**    | A greeting card with a ping when someone joins, and an announcement when someone leaves. Both texts are editable in `/setup` with `{user}`, `{name}`, `{server}` and `{count}`.                                                                          |
-| 🛟  | **Tickets**            | Support, Bug Report and message-report tickets in private channels. Claim and Close buttons, `/ticket add` and `/ticket remove`, a reminder and auto-close when the opener stops answering staff, and an HTML transcript with images and files embedded. |
-| 📋  | **Staff applications** | Application tickets with Accept and Deny buttons, a private staff note, a DM to the applicant, and the application role on acceptance.                                                                                                                   |
-| 🛡️  | **Moderation**         | Warn, timeout, kick, ban and purge. Every action becomes a numbered case with a mod-log entry. Actions on members also DM them and check the role hierarchy.                                                                                             |
-| 🖱️  | **Right-click menu**   | Warn, Timeout and Show warnings on a member. Report message on any message, which opens a private report ticket with a copy of it.                                                                                                                       |
-| 🚆  | **Game stats**         | `/stats` shows a member's XP, points, trips, kilometres and stops from the Roblox game, found through their Bloxlink link. Read-only: the bot never writes game data.                                                                                    |
-| 📜  | **Server log**         | Message edits and deletions, bulk deletes, joins, leaves, role changes and nickname changes.                                                                                                                                                             |
-| ⚙️  | **`/setup` dashboard** | Every channel, role, number and text is set in Discord. The dashboard warns when the bot lacks permissions. No IDs live in the code.                                                                                                                     |
+|     | Module                 | What it does                                                                                                                                                                                                                                                                           |
+| --- | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 🎫  | **Verification**       | A rules panel with a Verify button. Checks the Discord account age against a minimum, has an anti-spam cooldown and alerts staff about accounts that are too new. Built as its own module, ready for a Roblox account link.                                                            |
+| 👋  | **Welcome & leave**    | A greeting card with a ping when someone joins, and an announcement when someone leaves. Both texts are editable in `/setup` with `{user}`, `{name}`, `{server}` and `{count}`.                                                                                                        |
+| 🛟  | **Tickets**            | Support, Bug Report and message-report tickets in private channels. Claim and Close buttons, `/ticket add` and `/ticket remove`, a reminder and auto-close when the opener stops answering staff, and an HTML transcript with images and files embedded.                               |
+| 📋  | **Staff applications** | Application tickets with Accept and Deny buttons, a private staff note, a DM to the applicant, and the application role on acceptance.                                                                                                                                                 |
+| 🛡️  | **Moderation**         | Warn, timeout, kick, ban and purge. Every action becomes a numbered case with a mod-log entry. Actions on members also DM them and check the role hierarchy.                                                                                                                           |
+| 🖱️  | **Right-click menu**   | Warn, Timeout and Show warnings on a member. Report message on any message, which opens a private report ticket with a copy of it.                                                                                                                                                     |
+| 🚆  | **Game stats**         | `/stats` shows a member's XP, points, trips, kilometres and stops from the Roblox game, found through their Bloxlink link. `/leaderboard` shows the top 100 by XP or distance, 10 per page, with buttons to page through and switch boards. Read-only: the bot never writes game data. |
+| 📜  | **Server log**         | Message edits and deletions, bulk deletes, joins, leaves, role changes and nickname changes.                                                                                                                                                                                           |
+| ⚙️  | **`/setup` dashboard** | Every channel, role, number and text is set in Discord. The dashboard warns when the bot lacks permissions. No IDs live in the code.                                                                                                                                                   |
 
 ```mermaid
 flowchart LR
@@ -44,20 +44,21 @@ flowchart LR
 
 ## 💬 Commands
 
-| Command                                           | Who can use it   | What it does                                                        |
-| ------------------------------------------------- | ---------------- | ------------------------------------------------------------------- |
-| `/setup`                                          | Manage Server    | Opens the settings dashboard (only you see it)                      |
-| `/verify-panel`                                   | Manage Server    | Posts the verification panel in the verification channel            |
-| `/ticket-panel`                                   | Manage Server    | Posts the ticket panel in the current channel                       |
-| `/ticket add` · `/ticket remove`                  | Staff roles      | Gives a member access to the current ticket, or takes it away       |
-| `/warn` · `/warnings` · `/clearwarn`              | Moderate Members | Warns a member, lists active warnings, clears one or all            |
-| `/timeout` · `/untimeout`                         | Moderate Members | Times a member out (`10m`, `2h`, `1d`, up to 28 days) or lifts it   |
-| `/kick`                                           | Kick Members     | Kicks a member                                                      |
-| `/ban` · `/unban`                                 | Ban Members      | Bans (optionally deleting the last hour, day or week), unbans by ID |
-| `/purge`                                          | Manage Messages  | Deletes up to 1–100 of the last 100 messages, optionally one user's |
-| Right-click member → Warn, Timeout, Show warnings | Moderate Members | Same as the slash commands, with a short form                       |
-| Right-click message → Report message              | Everyone         | Opens a private report ticket with a copy of the message            |
-| `/stats [user]`                                   | Everyone         | Posts a member's game stats in the channel (default: your own)      |
+| Command                                           | Who can use it   | What it does                                                                                                                                        |
+| ------------------------------------------------- | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/setup`                                          | Manage Server    | Opens the settings dashboard (only you see it)                                                                                                      |
+| `/verify-panel`                                   | Manage Server    | Posts the verification panel in the verification channel                                                                                            |
+| `/ticket-panel`                                   | Manage Server    | Posts the ticket panel in the current channel                                                                                                       |
+| `/ticket add` · `/ticket remove`                  | Staff roles      | Gives a member access to the current ticket, or takes it away                                                                                       |
+| `/warn` · `/warnings` · `/clearwarn`              | Moderate Members | Warns a member, lists active warnings, clears one or all                                                                                            |
+| `/timeout` · `/untimeout`                         | Moderate Members | Times a member out (`10m`, `2h`, `1d`, up to 28 days) or lifts it                                                                                   |
+| `/kick`                                           | Kick Members     | Kicks a member                                                                                                                                      |
+| `/ban` · `/unban`                                 | Ban Members      | Bans (optionally deleting the last hour, day or week), unbans by ID                                                                                 |
+| `/purge`                                          | Manage Messages  | Deletes up to 1–100 of the last 100 messages, optionally one user's                                                                                 |
+| Right-click member → Warn, Timeout, Show warnings | Moderate Members | Same as the slash commands, with a short form                                                                                                       |
+| Right-click message → Report message              | Everyone         | Opens a private report ticket with a copy of the message                                                                                            |
+| `/stats [user]`                                   | Everyone         | Posts a member's game stats in the channel (default: your own)                                                                                      |
+| `/leaderboard [by]`                               | Everyone         | Posts the top 100 drivers by XP (default) or distance, with page and board buttons. Only you flip your message; others who click get a private copy |
 
 Staff roles come from `/setup`, and administrators always count as staff. You can change who sees each command in **Server Settings → Integrations → Railcore**, but the `/setup` dashboard re-checks **Manage Server** on every click, and the right-click Warn and Timeout forms re-check **Moderate Members** when they are sent. For actions on members the role hierarchy applies: nobody can moderate themselves, the owner, the bot, or someone with an equal or higher role.
 
@@ -137,15 +138,16 @@ If commands are registered both on the test server and globally, they show up tw
 
 ## 🚆 Game stats
 
-`/stats` reads the player's profile from the game's data store `FBR_Progress_v1` through Roblox Open Cloud. It finds the Roblox account through **Bloxlink**, so members must be verified with Bloxlink on the server. Both keys go into `.env`; never paste them into a chat.
+`/stats` reads the player's profile from the game's data store `FBR_Progress_v1` through Roblox Open Cloud. It finds the Roblox account through **Bloxlink**, so members must be verified with Bloxlink on the server. `/leaderboard` reads the game's ordered data stores `FBR_Leaderboard_XP_v1` and `FBR_Leaderboard_Km_v1` and only needs the Roblox key. Both keys go into `.env`; never paste them into a chat.
 
-1. **Roblox key**: in the Creator Hub, open **Open Cloud → API Keys → Create API Key** and pick the **group** that owns Falkenberg Railways as the owner. Add the **DataStore** API system for the game's universe with read access only (`universe-datastores.objects:read`, limited to `FBR_Progress_v1` if you can). Add the server's IP under **Accepted IP Addresses** if it is fixed, and set an expiry date.
+1. **Roblox key**: in the Creator Hub, open **Open Cloud → API Keys → Create API Key** and pick the **group** that owns Falkenberg Railways as the owner. Add the **DataStore** API system for the game's universe with read access only (`universe-datastores.objects:read`, limited to `FBR_Progress_v1` if you can), plus read access to **ordered data stores** for `/leaderboard`. Add the server's IP under **Accepted IP Addresses** if it is fixed, and set an expiry date.
 2. **Bloxlink key**: on [blox.link](https://blox.link), open **Dashboard → Developer**, pick this server and create a server API key.
 3. Put both into `.env` as `ROBLOX_API_KEY` and `BLOXLINK_API_KEY`, then restart the bot.
 
 Good to know:
 
 - The game saves at least once a minute while someone plays, and the bot caches each profile for a minute, so stats can be about two minutes behind.
+- The leaderboards are written at most once a minute per player and cached for a minute. Studio test profiles (negative user IDs) never appear.
 - A player who never played shows a "hasn't played yet" card. Missing or broken values count as 0, the same way the game treats them.
 - The bot only reads. It never writes to the game's data stores.
 

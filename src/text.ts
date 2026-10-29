@@ -37,6 +37,7 @@ export const t = {
     unban: 'Unban a user',
     purge: 'Bulk delete recent messages in this channel',
     stats: "Show a player's XP, points and driving stats from the game",
+    leaderboard: 'Show the top 100 drivers of Falkenberg Railways',
   },
 
   /** Right-click menu entries (Apps). Max 32 characters; re-register commands after changing. */
@@ -59,6 +60,7 @@ export const t = {
     userId: 'ID of the banned user',
     ticketUser: 'The member',
     statsUser: 'Whose stats to show (default: you)',
+    leaderboardBy: 'What to rank by (default: XP)',
   },
 
   time: {
@@ -344,6 +346,19 @@ export const t = {
     keyRejected: (host: string) =>
       `\`${host}\` rejected the bot's API key, so game stats are set up wrong. Please let a staff member know; the bot log has the details.`,
     bot: "Bots don't drive trains on Falkenberg Railways.",
+  },
+
+  leaderboard: {
+    by: { xp: 'XP', km: 'Distance' },
+    title: (by: string) => `🏆 Top drivers · ${by}`,
+    // "#4" rather than "4." so Discord doesn't turn the lines into a numbered list.
+    place: (n: number) => ['🥇', '🥈', '🥉'][n - 1] ?? `\`#${n}\``,
+    line: (place: string, name: string, value: string) => `${place} ${name} · **${value}**`,
+    xp: (xp: string) => `${xp} XP`,
+    empty: 'Nobody is on this board yet. Time to drive some trains!',
+    prev: '◀ Prev',
+    next: 'Next ▶',
+    page: (page: number, pages: number) => `Page ${page}/${pages}`,
   },
 
   mod: {
