@@ -2,12 +2,15 @@ import { escapeMarkdown, Events, type EmbedBuilder } from 'discord.js';
 import { defineEvent } from '../handlers.js';
 import { getConfig } from '../services/guildConfig.js';
 import { sendLog } from '../services/logs.js';
+import { syncNewMember } from '../services/xpRoleSync.js';
 import { t } from '../text.js';
 import { clip, embeds, userLine } from '../utils/embeds.js';
 
 export default defineEvent({
   name: Events.GuildMemberUpdate,
   async execute(oldMember, newMember) {
+    // XP roles wait for Membership Screening, so sync as soon as the member passes it.
+    if (oldMember.pending && !newMember.pending) void syncNewMember(newMember);
     // Nothing to compare against; ready.ts fills the member cache so this stays rare.
     if (oldMember.partial) return;
     const logEmbeds: EmbedBuilder[] = [];

@@ -59,10 +59,10 @@ type Lookup = () => ReturnType<typeof linkAndXp>;
  * Applies one member's result; failures other than a rejected key are logged and skipped. Tiers
  * are read per member, so an admin's change applies at once even during an hour-long pass.
  */
-async function syncOne(member: GuildMember, lookup: Lookup): Promise<void> {
+async function syncOne(member: GuildMember, lookup: Lookup, knownLinkOnly = false) {
   try {
     const tiers = await tiersOf(member.guild.id);
-    if (tiers.length) await applyXp(member, await lookup(), tiers);
+    if (tiers.length) await applyXp(member, await lookup(), tiers, knownLinkOnly);
   } catch (err) {
     if (isKeyRejected(err)) throw err;
     logger.warn({ err, userId: member.id }, 'XP role sync failed for member');
@@ -84,10 +84,12 @@ export function refreshKnown(guild: Guild): Promise<void> {
         where: { guildId_userId: { guildId: guild.id, userId } },
       });
       if (!member || !row) continue;
-      await syncOne(member, async () => ({
-        robloxId: row.robloxId,
-        xp: await xpOf(row.robloxId),
-      }));
+      // knownLinkOnly: the XP lookup takes a moment, and a relink in between must win.
+      await syncOne(
+        member,
+        async () => ({ robloxId: row.robloxId, xp: await xpOf(row.robloxId) }),
+        true,
+      );
       await sleep(250);
     }
   });

@@ -101,14 +101,23 @@ export const forgetMember = (guildId: string, userId: string) =>
  * Gives the member exactly the tier roles their XP reaches (`link` null = not linked: none),
  * remembers the link for the background sync, and announces a rank-up. Roles that aren't tiers
  * are never touched.
+ *
+ * `knownLinkOnly` is for the background refresh, which works from the stored link: it then only
+ * updates that link, and does nothing if /stats relinked or unlinked the member meanwhile.
  */
 export async function applyXp(
   member: GuildMember,
   link: { robloxId: string; xp: number } | null,
   allTiers: Tier[],
+  knownLinkOnly = false,
 ): Promise<void> {
-  // A role given during Membership Screening would let them skip it; they're synced later.
+  // A role given during Membership Screening would let them skip it; synced once they pass.
   if (member.pending) return;
+  const key = { guildId: member.guild.id, userId: member.id };
+  if (knownLinkOnly) {
+    const current = await prisma.linkedMember.findUnique({ where: { guildId_userId: key } });
+    if (!link || current?.robloxId !== link.robloxId) return;
+  }
   const tiers = activeTiers(member.guild, allTiers);
   const wanted = new Set(reachedTiers(tiers, link?.xp ?? null).map((tier) => tier.roleId));
   // One role per request: the array form PATCHes the whole role list from a possibly stale
@@ -120,7 +129,6 @@ export async function applyXp(
   }
 
   // Saved only after the roles, so a failed role edit is retried, announcement included.
-  const key = { guildId: member.guild.id, userId: member.id };
   if (!link) {
     await prisma.linkedMember.deleteMany({ where: key });
     return;
@@ -137,7 +145,7 @@ export async function applyXp(
       });
       if (count) tier = rankUp(tiers, previous.xp, link.xp);
     }
-  } else {
+  } else if (!knownLinkOnly) {
     // New, or switched to another Roblox account: no rank-up for that.
     await prisma.linkedMember.upsert({
       where: { guildId_userId: key },
