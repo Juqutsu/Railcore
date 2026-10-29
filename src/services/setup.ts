@@ -22,15 +22,22 @@ import { POST_PERMISSIONS as POST } from '../utils/permissions.js';
 export type SettingKey = keyof typeof t.setup.settings;
 
 type NumberSetting = { kind: 'number'; unit: keyof typeof t.setup.units; max: number };
+/** Stored as null while the default text (`fallback`) is used. */
+type TextSetting = { kind: 'text'; max: number; fallback: string };
 type Setting =
   | { kind: 'channel' | 'category'; permissions: PermissionsString[] }
   | { kind: 'role' | 'roles' }
-  | NumberSetting;
+  | NumberSetting
+  | TextSetting;
 
 export const SETTINGS: Record<SettingKey, Setting> = {
   verificationChannelId: { kind: 'channel', permissions: POST },
   verifiedRoleId: { kind: 'role' },
   minAccountAgeDays: { kind: 'number', unit: 'days', max: 365 },
+  welcomeChannelId: { kind: 'channel', permissions: POST },
+  welcomeMessage: { kind: 'text', max: 1000, fallback: t.welcome.defaultJoin },
+  leaveChannelId: { kind: 'channel', permissions: POST },
+  leaveMessage: { kind: 'text', max: 1000, fallback: t.welcome.defaultLeave },
   ticketReminderHours: { kind: 'number', unit: 'hours', max: 720 },
   ticketAutoCloseHours: { kind: 'number', unit: 'hours', max: 720 },
   ticketCategoryId: {
@@ -47,6 +54,10 @@ export const SETTINGS: Record<SettingKey, Setting> = {
 
 const GROUPS: { name: keyof typeof t.setup.groups; keys: SettingKey[] }[] = [
   { name: 'verification', keys: ['verificationChannelId', 'verifiedRoleId', 'minAccountAgeDays'] },
+  {
+    name: 'welcome',
+    keys: ['welcomeChannelId', 'welcomeMessage', 'leaveChannelId', 'leaveMessage'],
+  },
   {
     name: 'tickets',
     keys: [
@@ -68,6 +79,7 @@ function formatValue(config: GuildConfig, key: SettingKey): string {
   const value = config[key];
   const setting = SETTINGS[key];
   if (setting.kind === 'number' && typeof value === 'number') return t.setup[setting.unit](value);
+  if (setting.kind === 'text') return value ? t.setup.customText : t.setup.defaultText;
   if (Array.isArray(value)) {
     return value.length ? value.map((id) => `<@&${id}>`).join(' ') : t.setup.notSet;
   }
@@ -110,28 +122,37 @@ export function setupEditor(
   key: SettingKey,
 ): BaseMessageOptions {
   const { label, description } = t.setup.settings[key];
-  const embed = embeds.info(
-    t.setup.editTitle(label),
-    `${description}\n\n**${t.setup.current}:** ${formatValue(config, key)}`,
-  );
+  const setting = SETTINGS[key];
+  const value = config[key];
+  const body =
+    setting.kind === 'text'
+      ? `${description}\n${t.setup.placeholders}\n\n**${t.setup.current}:** ${formatValue(config, key)}\n>>> ${typeof value === 'string' ? value : setting.fallback}`
+      : `${description}\n\n**${t.setup.current}:** ${formatValue(config, key)}`;
+  const embed = embeds.info(t.setup.editTitle(label), body);
   const back = new ButtonBuilder()
     .setCustomId('setup:back')
     .setLabel(t.setup.back)
     .setStyle(ButtonStyle.Secondary);
-  const setting = SETTINGS[key];
 
-  if (setting.kind === 'number') {
-    const change = new ButtonBuilder()
-      .setCustomId(`setup:number:${key}`)
-      .setLabel(t.setup.change)
-      .setStyle(ButtonStyle.Primary);
-    return {
-      embeds: [embed],
-      components: [new ActionRowBuilder<ButtonBuilder>().addComponents(change, back)],
-    };
+  if (setting.kind === 'number' || setting.kind === 'text') {
+    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`setup:${setting.kind}:${key}`)
+        .setLabel(t.setup.change)
+        .setStyle(ButtonStyle.Primary),
+      back,
+    );
+    if (setting.kind === 'text') {
+      row.addComponents(
+        new ButtonBuilder()
+          .setCustomId(`setup:clear:${key}`)
+          .setLabel(t.setup.useDefault)
+          .setStyle(ButtonStyle.Danger),
+      );
+    }
+    return { embeds: [embed], components: [row] };
   }
 
-  const value = config[key];
   const current = (Array.isArray(value) ? value : [value]).filter(
     (id): id is string => typeof id === 'string',
   );
@@ -190,6 +211,29 @@ export function numberModal(
             .setMinLength(1)
             .setMaxLength(String(setting.max).length)
             .setValue(String(current)),
+        ),
+    );
+}
+
+export function textModal(
+  key: SettingKey,
+  setting: TextSetting,
+  current: string | null,
+): ModalBuilder {
+  return new ModalBuilder()
+    .setCustomId(`setup:text:${key}`)
+    .setTitle(t.setup.settings[key].label)
+    .addLabelComponents(
+      new LabelBuilder()
+        .setLabel(t.setup.messageLabel)
+        .setDescription(t.setup.textHint)
+        .setTextInputComponent(
+          new TextInputBuilder()
+            .setCustomId('value')
+            .setStyle(TextInputStyle.Paragraph)
+            .setRequired(false)
+            .setMaxLength(setting.max)
+            .setValue(current ?? setting.fallback),
         ),
     );
 }

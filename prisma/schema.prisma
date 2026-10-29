@@ -26,6 +26,12 @@ model GuildConfig {
   ticketReminderHours   Int      @default(24)
   /// Hours after the reminder until the ticket closes itself; 0 = never.
   ticketAutoCloseHours  Int      @default(24)
+  welcomeChannelId      String?
+  /// Custom greeting with {user} {name} {server} {count}; null = default text.
+  welcomeMessage        String?
+  leaveChannelId        String?
+  /// Custom leave text, same placeholders; null = default text.
+  leaveMessage          String?
   updatedAt             DateTime @updatedAt
 }
 

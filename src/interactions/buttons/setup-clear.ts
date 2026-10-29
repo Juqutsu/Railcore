@@ -11,9 +11,11 @@ export default defineComponent({
     if (!isSettingKey(key) || SETTINGS[key].kind === 'number') {
       throw new UserError(t.errors.unknownInteraction);
     }
-    const config = await updateConfig(interaction.guildId, {
-      [key]: SETTINGS[key].kind === 'roles' ? [] : null,
-    });
-    await interaction.update(setupOverview(config, t.setup.cleared(t.setup.settings[key].label)));
+    const { kind } = SETTINGS[key];
+    const config = await updateConfig(interaction.guildId, { [key]: kind === 'roles' ? [] : null });
+    const label = t.setup.settings[key].label;
+    await interaction.update(
+      setupOverview(config, kind === 'text' ? t.setup.usingDefault(label) : t.setup.cleared(label)),
+    );
   },
 });

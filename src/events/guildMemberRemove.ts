@@ -1,6 +1,7 @@
 import { Events, time, TimestampStyles } from 'discord.js';
 import { defineEvent } from '../handlers.js';
 import { sendLog } from '../services/logs.js';
+import { sendLeave } from '../services/welcome.js';
 import { t } from '../text.js';
 import { clip, embeds, userLine } from '../utils/embeds.js';
 
@@ -31,6 +32,9 @@ export default defineEvent({
           value: roles === null ? t.serverLog.unknown : clip(roles, 1024) || t.serverLog.none,
         },
       );
-    await sendLog(member.guild, 'serverLogChannelId', { embeds: [embed] });
+    await Promise.all([
+      sendLog(member.guild, 'serverLogChannelId', { embeds: [embed] }),
+      sendLeave(member),
+    ]);
   },
 });

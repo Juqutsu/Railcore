@@ -317,6 +317,11 @@ export const t = {
     none: '*None*',
   },
 
+  welcome: {
+    defaultJoin: "Welcome to **{server}**, **{name}**! 👋\nYou're member **#{count}**.",
+    defaultLeave: '**{name}** left the server. We are now **{count}** members.',
+  },
+
   mod: {
     noReason: 'No reason given',
     warnModalTitle: (user: string) => `Warn ${user}`,
@@ -429,6 +434,7 @@ export const t = {
     days: (n: number) => (n === 0 ? 'Off' : `${n} day${n === 1 ? '' : 's'}`),
     groups: {
       verification: 'Verification',
+      welcome: 'Welcome & leave',
       tickets: 'Tickets & applications',
       logs: 'Logs',
     },
@@ -450,6 +456,14 @@ export const t = {
     units: { days: 'Days', hours: 'Hours' },
     numberHint: (max: number) => `Whole number from 0 to ${max}. 0 turns it off.`,
     invalidNumber: (max: number) => `Enter a whole number from 0 to ${max}.`,
+    customText: '`Custom`',
+    defaultText: '`Default`',
+    useDefault: 'Use default',
+    usingDefault: (label: string) => `✅ **${label}** now uses the default text.`,
+    messageLabel: 'Message',
+    textHint: 'Placeholders: {user} {name} {server} {count}. Empty = default text.',
+    placeholders:
+      '`{user}` mention · `{name}` display name · `{server}` server name · `{count}` member count',
     settings: {
       verificationChannelId: {
         label: 'Verification channel',
@@ -462,6 +476,22 @@ export const t = {
       minAccountAgeDays: {
         label: 'Minimum account age',
         description: "Younger Discord accounts can't verify.",
+      },
+      welcomeChannelId: {
+        label: 'Welcome channel',
+        description: 'New members are greeted here. Not set = no greeting.',
+      },
+      welcomeMessage: {
+        label: 'Welcome message',
+        description: 'Text of the greeting.',
+      },
+      leaveChannelId: {
+        label: 'Leave channel',
+        description: 'Members who leave are announced here. Not set = no message.',
+      },
+      leaveMessage: {
+        label: 'Leave message',
+        description: 'Text of the leave message.',
       },
       ticketCategoryId: {
         label: 'Ticket category',

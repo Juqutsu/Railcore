@@ -2,10 +2,15 @@ import type { Guild, MessageCreateOptions } from 'discord.js';
 import { logger } from '../utils/logger.js';
 import { getConfig } from './guildConfig.js';
 
-type LogChannel = 'modLogChannelId' | 'serverLogChannelId' | 'ticketLogChannelId';
+type LogChannel =
+  | 'modLogChannelId'
+  | 'serverLogChannelId'
+  | 'ticketLogChannelId'
+  | 'welcomeChannelId'
+  | 'leaveChannelId';
 
 /**
- * Posts to a configured log channel and reports whether it arrived.
+ * Posts to a configured log (or welcome/leave) channel and reports whether it arrived.
  * Never throws: a broken log channel must not break the action.
  */
 export async function sendLog(
