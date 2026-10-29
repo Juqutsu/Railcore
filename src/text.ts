@@ -36,6 +36,7 @@ export const t = {
     ban: 'Ban a user from the server',
     unban: 'Unban a user',
     purge: 'Bulk delete recent messages in this channel',
+    stats: "Show a player's XP, points and driving stats from the game",
   },
 
   /** Right-click menu entries (Apps). Max 32 characters; re-register commands after changing. */
@@ -57,6 +58,7 @@ export const t = {
     purgeUser: 'Only delete messages from this user',
     userId: 'ID of the banned user',
     ticketUser: 'The member',
+    statsUser: 'Whose stats to show (default: you)',
   },
 
   time: {
@@ -320,6 +322,28 @@ export const t = {
   welcome: {
     defaultJoin: "Welcome to **{server}**, **{name}**! 👋\nYou're member **#{count}**.",
     defaultLeave: '**{name}** left the server. We are now **{count}** members.',
+  },
+
+  stats: {
+    title: (displayName: string, name: string) =>
+      displayName === name ? name : `${displayName} (@${name})`,
+    unknownName: (id: string) => `Roblox user ${id}`,
+    statsFor: (user: string) => `Driver card of ${user} on Falkenberg Railways.`,
+    neverPlayed: (user: string) => `${user} hasn't played Falkenberg Railways yet.`,
+    xp: '⭐ XP',
+    points: '🪙 Points',
+    trips: '🚆 Trips',
+    distance: '🛤️ Distance',
+    km: (km: string) => `${km} km`,
+    stops: '🚏 Stops served',
+    notLinkedSelf:
+      "You haven't linked a Roblox account yet. Verify with **Bloxlink** on this server, then try again.",
+    notLinked: (user: string) => `${user} hasn't linked a Roblox account with Bloxlink yet.`,
+    notConfigured: "Game stats aren't set up on this bot yet. Please let a staff member know.",
+    unavailable: "I couldn't reach Roblox or Bloxlink right now. Please try again in a minute.",
+    keyRejected: (host: string) =>
+      `\`${host}\` rejected the bot's API key, so game stats are set up wrong. Please let a staff member know; the bot log has the details.`,
+    bot: "Bots don't drive trains on Falkenberg Railways.",
   },
 
   mod: {

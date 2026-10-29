@@ -7,6 +7,9 @@ const schema = z.object({
     .regex(/^\d{17,20}$/, 'must be a server ID')
     .optional(),
   DATABASE_URL: z.string().min(1),
+  // Both are needed for /stats; without them the command says it isn't set up.
+  ROBLOX_API_KEY: z.string().optional(),
+  BLOXLINK_API_KEY: z.string().optional(),
   NODE_ENV: z.enum(['development', 'production']).default('development'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
 });

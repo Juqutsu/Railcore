@@ -14,7 +14,7 @@ Verification, welcome messages, tickets, staff applications, moderation and logs
 ![Prisma 7](https://img.shields.io/badge/Prisma-7-2D3748?logo=prisma&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)
 
-[Features](#-features) · [Commands](#-commands) · [Quick start](#-quick-start) · [Setup in Discord](#-set-it-up-in-discord) · [Deploy](#-deploy-with-docker) · [Development](#%EF%B8%8F-development)
+[Features](#-features) · [Commands](#-commands) · [Quick start](#-quick-start) · [Setup in Discord](#-set-it-up-in-discord) · [Game stats](#-game-stats) · [Deploy](#-deploy-with-docker) · [Development](#%EF%B8%8F-development)
 
 </div>
 
@@ -30,6 +30,7 @@ Verification, welcome messages, tickets, staff applications, moderation and logs
 | 📋  | **Staff applications** | Application tickets with Accept and Deny buttons, a private staff note, a DM to the applicant, and the application role on acceptance.                                                                                                                   |
 | 🛡️  | **Moderation**         | Warn, timeout, kick, ban and purge. Every action becomes a numbered case with a mod-log entry. Actions on members also DM them and check the role hierarchy.                                                                                             |
 | 🖱️  | **Right-click menu**   | Warn, Timeout and Show warnings on a member. Report message on any message, which opens a private report ticket with a copy of it.                                                                                                                       |
+| 🚆  | **Game stats**         | `/stats` shows a member's XP, points, trips, kilometres and stops from the Roblox game, found through their Bloxlink link. Read-only: the bot never writes game data.                                                                                    |
 | 📜  | **Server log**         | Message edits and deletions, bulk deletes, joins, leaves, role changes and nickname changes.                                                                                                                                                             |
 | ⚙️  | **`/setup` dashboard** | Every channel, role, number and text is set in Discord. The dashboard warns when the bot lacks permissions. No IDs live in the code.                                                                                                                     |
 
@@ -56,6 +57,7 @@ flowchart LR
 | `/purge`                                          | Manage Messages  | Deletes up to 1–100 of the last 100 messages, optionally one user's |
 | Right-click member → Warn, Timeout, Show warnings | Moderate Members | Same as the slash commands, with a short form                       |
 | Right-click message → Report message              | Everyone         | Opens a private report ticket with a copy of the message            |
+| `/stats [user]`                                   | Everyone         | Posts a member's game stats in the channel (default: your own)      |
 
 Staff roles come from `/setup`, and administrators always count as staff. You can change who sees each command in **Server Settings → Integrations → Railcore**, but the `/setup` dashboard re-checks **Manage Server** on every click, and the right-click Warn and Timeout forms re-check **Moderate Members** when they are sent. For actions on members the role hierarchy applies: nobody can moderate themselves, the owner, the bot, or someone with an equal or higher role.
 
@@ -102,6 +104,8 @@ npm run dev              # starts the bot and restarts it when you save a file
 | `POSTGRES_USER`     | Docker         | Database user. Default `railcore`.                                                                       |
 | `POSTGRES_PASSWORD` | Docker         | Database password. Use letters and digits only, because it becomes part of a URL. **Change it.**         |
 | `POSTGRES_DB`       | Docker         | Database name. Default `railcore`.                                                                       |
+| `ROBLOX_API_KEY`    | `/stats`       | Roblox Open Cloud key with read access to the game's data stores (see [Game stats](#-game-stats)).       |
+| `BLOXLINK_API_KEY`  | `/stats`       | Bloxlink server API key, used to find a member's linked Roblox account.                                  |
 | `LOG_LEVEL`         | optional       | `fatal`, `error`, `warn`, `info` (default), `debug` or `trace`.                                          |
 | `NODE_ENV`          | set by Docker  | `production` switches logs to JSON. Leave it unset locally for readable, colored logs.                   |
 
@@ -130,6 +134,20 @@ If commands are registered both on the test server and globally, they show up tw
 2. Run **`/verify-panel`**. It posts the panel in the verification channel.
 3. Run **`/ticket-panel`** in the channel where members should open tickets.
 4. Hide your normal channels from `@everyone` and allow the Verified role, so only verified members see them. Keep the welcome channel visible to `@everyone` if new members should see their greeting before they verify.
+
+## 🚆 Game stats
+
+`/stats` reads the player's profile from the game's data store `FBR_Progress_v1` through Roblox Open Cloud. It finds the Roblox account through **Bloxlink**, so members must be verified with Bloxlink on the server. Both keys go into `.env`; never paste them into a chat.
+
+1. **Roblox key**: in the Creator Hub, open **Open Cloud → API Keys → Create API Key** and pick the **group** that owns Falkenberg Railways as the owner. Add the **DataStore** API system for the game's universe with read access only (`universe-datastores.objects:read`, limited to `FBR_Progress_v1` if you can). Add the server's IP under **Accepted IP Addresses** if it is fixed, and set an expiry date.
+2. **Bloxlink key**: on [blox.link](https://blox.link), open **Dashboard → Developer**, pick this server and create a server API key.
+3. Put both into `.env` as `ROBLOX_API_KEY` and `BLOXLINK_API_KEY`, then restart the bot.
+
+Good to know:
+
+- The game saves at least once a minute while someone plays, and the bot caches each profile for a minute, so stats can be about two minutes behind.
+- A player who never played shows a "hasn't played yet" card. Missing or broken values count as 0, the same way the game treats them.
+- The bot only reads. It never writes to the game's data stores.
 
 ## 🐳 Deploy with Docker
 
@@ -215,12 +233,12 @@ src/
 ├─ env.ts              Validates .env
 ├─ text.ts             All user-facing text
 ├─ handlers.ts         Loads commands, events and interactions automatically
-├─ commands/           Slash and right-click commands, one file each (admin/, context/, verification/, tickets/, moderation/)
+├─ commands/           Slash and right-click commands, one file each (admin/, context/, verification/, tickets/, moderation/, game/)
 ├─ events/             Discord events (interactions, welcome and server log, ready)
 ├─ interactions/       Buttons, select menus and modals (buttons/, selects/, modals/)
-├─ services/           Feature logic: setup, verification, welcome, tickets, applications, transcripts, moderation, logs
+├─ services/           Feature logic: setup, verification, welcome, game stats (roblox), tickets, applications, transcripts, moderation, logs
 ├─ database/           Prisma client
-├─ utils/              Embeds, errors, permissions, durations, cooldowns, templates, logger
+├─ utils/              Embeds, errors, permissions, durations, cooldowns, templates, game progress, logger
 └─ scripts/            deploy-commands.ts, dev-db.ts
 prisma/
 ├─ schema.prisma       Database schema
@@ -238,14 +256,16 @@ prisma/
 
 ## 🩺 Troubleshooting
 
-| Symptom                                                                                | Fix                                                                                                                                             |
-| -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Startup failed` with `Used disallowed intents`                                        | Turn on both privileged intents (see [Create the Discord bot](#create-the-discord-bot)).                                                        |
-| `Startup failed` with `Can't reach database server` or `Connection terminated` (local) | The local database isn't running. Run `npm run db:dev`; if it still fails, look at `.dev-db/postgres.log`.                                      |
-| Users see "I'm missing a permission to do that"                                        | Check the bot's role position and its permissions in that channel. Picking a channel again in `/setup` tells you which permissions are missing. |
-| A command is missing                                                                   | Register the commands again (see [Register the slash commands](#register-the-slash-commands)).                                                  |
-| Commands show up twice                                                                 | Registered on the test server and globally: run `npm run commands:dev -- --clear`.                                                              |
-| Users see "Something went off the rails … Reference: `abc123`"                         | Search the logs for `"ref":"abc123"` (or `ref: "abc123"` locally) to find the full error.                                                       |
+| Symptom                                                                                | Fix                                                                                                                                                      |
+| -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Startup failed` with `Used disallowed intents`                                        | Turn on both privileged intents (see [Create the Discord bot](#create-the-discord-bot)).                                                                 |
+| `Startup failed` with `Can't reach database server` or `Connection terminated` (local) | The local database isn't running. Run `npm run db:dev`; if it still fails, look at `.dev-db/postgres.log`.                                               |
+| Users see "I'm missing a permission to do that"                                        | Check the bot's role position and its permissions in that channel. Picking a channel again in `/setup` tells you which permissions are missing.          |
+| A command is missing                                                                   | Register the commands again (see [Register the slash commands](#register-the-slash-commands)).                                                           |
+| Commands show up twice                                                                 | Registered on the test server and globally: run `npm run commands:dev -- --clear`.                                                                       |
+| Users see "Something went off the rails … Reference: `abc123`"                         | Search the logs for `"ref":"abc123"` (or `ref: "abc123"` locally) to find the full error.                                                                |
+| `/stats` says `api.blox.link` rejected the bot's API key                               | The log shows Bloxlink's reason. `Guild ID does not match API Key` means the key was made for another server: create one for the server the bot runs on. |
+| `/stats` says `apis.roblox.com` rejected the bot's API key                             | The Roblox key is expired, lacks read access to `FBR_Progress_v1`, or the server's IP isn't in its **Accepted IP Addresses**.                            |
 
 ## 📌 Known limitations
 
