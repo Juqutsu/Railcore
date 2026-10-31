@@ -26,7 +26,7 @@ type NumberSetting = { kind: 'number'; unit: keyof typeof t.setup.units; max: nu
 type TextSetting = { kind: 'text'; max: number; fallback: string };
 type Setting =
   | { kind: 'channel' | 'category'; permissions: PermissionsString[] }
-  | { kind: 'role' | 'roles' }
+  | { kind: 'role' | 'roles' | 'toggle' }
   | NumberSetting
   | TextSetting;
 
@@ -48,6 +48,7 @@ export const SETTINGS: Record<SettingKey, Setting> = {
   ticketLogChannelId: { kind: 'channel', permissions: [...POST, 'AttachFiles'] },
   staffRoleIds: { kind: 'roles' },
   applicationRoleId: { kind: 'role' },
+  applicationsOpen: { kind: 'toggle' },
   modLogChannelId: { kind: 'channel', permissions: POST },
   serverLogChannelId: { kind: 'channel', permissions: POST },
   rankUpChannelId: { kind: 'channel', permissions: POST },
@@ -69,6 +70,7 @@ const GROUPS: { name: keyof typeof t.setup.groups; keys: SettingKey[] }[] = [
       'ticketLogChannelId',
       'staffRoleIds',
       'applicationRoleId',
+      'applicationsOpen',
       'ticketReminderHours',
       'ticketAutoCloseHours',
     ],
@@ -86,6 +88,7 @@ function formatValue(config: GuildConfig, key: SettingKey): string {
   const setting = SETTINGS[key];
   if (setting.kind === 'number' && typeof value === 'number') return t.setup[setting.unit](value);
   if (setting.kind === 'text') return value ? t.setup.customText : t.setup.defaultText;
+  if (setting.kind === 'toggle') return value ? t.setup.on : t.setup.off;
   if (Array.isArray(value)) {
     return value.length ? value.map((id) => `<@&${id}>`).join(' ') : t.setup.notSet;
   }
@@ -143,6 +146,18 @@ export function setupEditor(
     .setCustomId('setup:back')
     .setLabel(t.setup.back)
     .setStyle(ButtonStyle.Secondary);
+
+  if (setting.kind === 'toggle') {
+    // The target state is in the ID, so a stale or double click repeats it instead of undoing it.
+    const toggle = new ButtonBuilder()
+      .setCustomId(`setup:toggle:${key}:${value ? 'off' : 'on'}`)
+      .setLabel(value ? t.setup.turnOff : t.setup.turnOn)
+      .setStyle(value ? ButtonStyle.Danger : ButtonStyle.Success);
+    return {
+      embeds: [embed],
+      components: [new ActionRowBuilder<ButtonBuilder>().addComponents(toggle, back)],
+    };
+  }
 
   if (setting.kind === 'number' || setting.kind === 'text') {
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(

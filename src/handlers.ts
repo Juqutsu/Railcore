@@ -13,6 +13,8 @@ import {
   type RESTPostAPIApplicationCommandsJSONBody,
   type UserContextMenuCommandInteraction,
 } from 'discord.js';
+import { isServedGuild } from './services/guildLock.js';
+import { guildIdOf } from './utils/allowlist.js';
 import { logger } from './utils/logger.js';
 
 type CommandInteraction =
@@ -96,7 +98,11 @@ export async function loadHandlers(client: Client): Promise<void> {
   }
 
   for (const event of await importDefaults<Event>('events')) {
-    const listener = (...args: unknown[]) =>
+    const listener = (...args: unknown[]) => {
+      // Each copy handles only its own server (see services/guildLock.ts). Joining a server
+      // still runs everywhere, so a foreign server is left.
+      const guildId = event.name === 'guildCreate' ? undefined : guildIdOf(args);
+      if (guildId && !isServedGuild(guildId)) return;
       void (async () => {
         try {
           await event.execute(...(args as ClientEvents[keyof ClientEvents]));
@@ -104,6 +110,7 @@ export async function loadHandlers(client: Client): Promise<void> {
           logger.error({ err, event: event.name }, 'Event handler failed');
         }
       })();
+    };
     if (event.once) client.once(event.name, listener);
     else client.on(event.name, listener);
   }

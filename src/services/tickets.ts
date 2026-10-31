@@ -5,6 +5,7 @@ import {
   ButtonBuilder,
   ButtonStyle,
   ChannelType,
+  ComponentType,
   LabelBuilder,
   ModalBuilder,
   OverwriteType,
@@ -34,8 +35,9 @@ import { t } from '../text.js';
 import { createCooldown } from '../utils/cooldown.js';
 import { clip, embeds, userLine } from '../utils/embeds.js';
 import { UserError } from '../utils/errors.js';
+import { logger } from '../utils/logger.js';
 import { sendDm } from './dm.js';
-import { getConfig } from './guildConfig.js';
+import { getConfig, updateConfig } from './guildConfig.js';
 import { sendLog } from './logs.js';
 import {
   fetchAllMessages,
@@ -114,18 +116,86 @@ const questionText = (type: TicketType, id: string) =>
 export const isPanelType = (value: string | undefined): value is PanelType =>
   (PANEL_TYPES as readonly string[]).includes(value ?? '');
 
-export function ticketPanel(): BaseMessageOptions {
-  const buttons = PANEL_TYPES.map((type) =>
-    new ButtonBuilder()
+export function ticketPanel(applicationsOpen: boolean): BaseMessageOptions {
+  const buttons = PANEL_TYPES.map((type) => {
+    const button = new ButtonBuilder()
       .setCustomId(`ticket:open:${type}`)
       .setLabel(t.tickets.types[type].label)
       .setEmoji(t.tickets.types[type].emoji)
-      .setStyle(BUTTON_STYLES[type]),
-  );
+      .setStyle(BUTTON_STYLES[type]);
+    if (type === 'APPLICATION' && !applicationsOpen) {
+      button.setLabel(t.tickets.applicationsClosedLabel).setStyle(ButtonStyle.Secondary);
+      button.setDisabled(true);
+    }
+    return button;
+  });
   return {
-    embeds: [embeds.info(t.tickets.panelTitle, t.tickets.panelBody)],
+    embeds: [embeds.info(t.tickets.panelTitle, t.tickets.panelBody(applicationsOpen))],
     components: [new ActionRowBuilder<ButtonBuilder>().addComponents(buttons)],
   };
+}
+
+const isTicketPanel = (message: Message) =>
+  message.components.some(
+    (row) =>
+      row.type === ComponentType.ActionRow &&
+      row.components.some((part) => part.customId?.startsWith('ticket:open:')),
+  );
+
+/** The panel /ticket-panel remembered, or null if there is none or it was deleted. */
+async function storedPanel(guild: Guild, config: GuildConfig): Promise<Message | null> {
+  if (!config.ticketPanelChannelId || !config.ticketPanelMessageId) return null;
+  const channel = guild.channels.cache.get(config.ticketPanelChannelId);
+  if (!channel?.isTextBased()) return null;
+  return channel.messages.fetch(config.ticketPanelMessageId).catch(() => null);
+}
+
+/**
+ * The bot's ticket panels among the last 50 messages of each channel it can read. Covers panels
+ * posted before the bot remembered them; ticket channels are skipped.
+ */
+async function findPanels(guild: Guild, config: GuildConfig): Promise<Message[]> {
+  const me = guild.members.me;
+  if (!me) return [];
+  const found: Message[] = [];
+  for (const channel of guild.channels.cache.values()) {
+    if (channel.type !== ChannelType.GuildText || channel.parentId === config.ticketCategoryId) {
+      continue;
+    }
+    if (!channel.permissionsFor(me).has(['ViewChannel', 'ReadMessageHistory'])) continue;
+    const messages = await channel.messages.fetch({ limit: 50 }).catch(() => null);
+    for (const message of messages?.values() ?? []) {
+      if (message.author.id === me.id && isTicketPanel(message)) found.push(message);
+    }
+  }
+  return found;
+}
+
+/**
+ * Re-renders the ticket panel after applications were turned on or off: the remembered one, or
+ * else every panel the bot finds, remembering the newest. Returns how many were updated.
+ */
+export async function refreshTicketPanel(guild: Guild): Promise<number> {
+  const config = await getConfig(guild.id);
+  const stored = await storedPanel(guild, config);
+  const panels = stored ? [stored] : await findPanels(guild, config);
+  let updated = 0;
+  for (const message of panels) {
+    try {
+      await message.edit(ticketPanel(config.applicationsOpen));
+      updated++;
+    } catch (err) {
+      logger.warn({ err, guildId: guild.id }, 'Could not update a ticket panel');
+    }
+  }
+  const newest = panels.toSorted((a, b) => b.createdTimestamp - a.createdTimestamp)[0];
+  if (!stored && newest) {
+    await updateConfig(guild.id, {
+      ticketPanelChannelId: newest.channelId,
+      ticketPanelMessageId: newest.id,
+    });
+  }
+  return updated;
 }
 
 export function ticketModal(type: TicketType, customId = `ticket:create:${type}`): ModalBuilder {
@@ -273,8 +343,13 @@ const cooldownError = (wait: number) =>
 
 /** Throws a UserError if this member can't open a ticket of this type right now. */
 export async function assertCanOpen(member: GuildMember, type: TicketType) {
-  const setup = ticketSetup(member.guild, await getConfig(member.guild.id));
+  const config = await getConfig(member.guild.id);
+  const setup = ticketSetup(member.guild, config);
   if (!setup) throw new UserError(t.tickets.notConfigured);
+  // Also catches panels posted before the toggle existed and forms opened before it was flipped.
+  if (type === 'APPLICATION' && !config.applicationsOpen) {
+    throw new UserError(t.tickets.applicationsClosed);
+  }
   const wait = opened.peek(`${member.guild.id}:${member.id}`);
   if (wait) throw cooldownError(wait);
   const existing = await findOpenTicket(member.guild, member.id, type);

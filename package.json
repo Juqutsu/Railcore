@@ -13,6 +13,7 @@
     "build": "prisma generate && tsc",
     "start": "node --env-file-if-exists=.env dist/index.js",
     "commands:dev": "tsx --env-file-if-exists=.env src/scripts/deploy-commands.ts --guild",
+    "commands:prod": "tsx --env-file-if-exists=.env src/scripts/deploy-commands.ts --prod",
     "commands:global": "tsx --env-file-if-exists=.env src/scripts/deploy-commands.ts --global",
     "db:dev": "tsx src/scripts/dev-db.ts start",
     "db:stop": "tsx src/scripts/dev-db.ts stop",

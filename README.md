@@ -98,44 +98,59 @@ npm run dev              # starts the bot and restarts it when you save a file
 
 ### Environment variables
 
-| Variable            | Needed for         | What it is                                                                                               |
-| ------------------- | ------------------ | -------------------------------------------------------------------------------------------------------- |
-| `DISCORD_BOT_TOKEN` | always             | The bot token from the Developer Portal.                                                                 |
-| `TEST_SERVER_ID`    | `commands:dev`     | ID of your test server (enable Developer Mode in Discord, then right-click the server → Copy Server ID). |
-| `DATABASE_URL`      | local dev          | Postgres connection URL. In Docker it is built from the `POSTGRES_*` values and this line is ignored.    |
-| `POSTGRES_USER`     | Docker             | Database user. Default `railcore`.                                                                       |
-| `POSTGRES_PASSWORD` | Docker             | Database password. Use letters and digits only, because it becomes part of a URL. **Change it.**         |
-| `POSTGRES_DB`       | Docker             | Database name. Default `railcore`.                                                                       |
-| `ROBLOX_API_KEY`    | game features      | Roblox Open Cloud key with read access to the game's data stores (see [Game stats](#-game-stats)).       |
-| `BLOXLINK_API_KEY`  | `/stats`, XP roles | Bloxlink server API key, used to find a member's linked Roblox account.                                  |
-| `LOG_LEVEL`         | optional           | `fatal`, `error`, `warn`, `info` (default), `debug` or `trace`.                                          |
-| `NODE_ENV`          | set by Docker      | `production` switches logs to JSON. Leave it unset locally for readable, colored logs.                   |
+| Variable            | Needed for         | What it is                                                                                                                                             |
+| ------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `DISCORD_BOT_TOKEN` | always             | The bot token from the Developer Portal.                                                                                                               |
+| `TEST_SERVER_ID`    | `commands:dev`     | ID of your test server (enable Developer Mode in Discord, then right-click the server → Copy Server ID).                                               |
+| `PROD_SERVER_ID`    | `commands:prod`    | ID of the production server. With both server IDs set, the bot works only on these two servers and leaves any other (see [Server lock](#server-lock)). |
+| `DATABASE_URL`      | local dev          | Postgres connection URL. In Docker it is built from the `POSTGRES_*` values and this line is ignored.                                                  |
+| `POSTGRES_USER`     | Docker             | Database user. Default `railcore`.                                                                                                                     |
+| `POSTGRES_PASSWORD` | Docker             | Database password. Use letters and digits only, because it becomes part of a URL. **Change it.**                                                       |
+| `POSTGRES_DB`       | Docker             | Database name. Default `railcore`.                                                                                                                     |
+| `ROBLOX_API_KEY`    | game features      | Roblox Open Cloud key with read access to the game's data stores (see [Game stats](#-game-stats)).                                                     |
+| `BLOXLINK_API_KEY`  | `/stats`, XP roles | Bloxlink server API key, used to find a member's linked Roblox account.                                                                                |
+| `LOG_LEVEL`         | optional           | `fatal`, `error`, `warn`, `info` (default), `debug` or `trace`.                                                                                        |
+| `NODE_ENV`          | set by Docker      | `production` switches logs to JSON. Leave it unset locally for readable, colored logs.                                                                 |
 
 ### Register the slash commands
 
 Discord only shows commands that have been registered. Register again whenever you add a command or change its name, description or options.
 
-| Command                           | Where                          | When to use                                   |
-| --------------------------------- | ------------------------------ | --------------------------------------------- |
-| `npm run commands:dev`            | Only `TEST_SERVER_ID`, instant | While developing                              |
-| `npm run commands:global`         | Every server the bot is in     | Production. Can take a few minutes to appear. |
-| `npm run commands:dev -- --clear` | Removes the test-server copies | After going global, to avoid duplicates       |
+| Command                           | Where                          | When to use                                                                 |
+| --------------------------------- | ------------------------------ | --------------------------------------------------------------------------- |
+| `npm run commands:dev`            | Only `TEST_SERVER_ID`, instant | While developing                                                            |
+| `npm run commands:prod`           | Only `PROD_SERVER_ID`, instant | Production                                                                  |
+| `npm run commands:global`         | Every server the bot is in     | Only if the bot serves other servers too. Can take a few minutes to appear. |
+| `npm run commands:dev -- --clear` | Removes the test-server copies | After going global, to avoid duplicates                                     |
 
-If commands are registered both on the test server and globally, they show up twice on the test server. Clear the test-server copies with the last command.
+Use `commands:dev` and `commands:prod`, not `commands:global`: then each server has exactly one copy. If commands are registered both on a server and globally, they show up twice there. If you used `commands:global` before, remove the global copies once with `npm run commands:global -- --clear` (Docker: `docker compose run --rm bot node dist/scripts/deploy-commands.js --global --clear`).
+
+### Test and production
+
+The bot on your PC and the one on the VPS share the bot token, so both receive everything from both servers. Each copy handles **only its own server** and ignores the other completely:
+
+- **Docker (`NODE_ENV=production`)**: only `PROD_SERVER_ID`, with the VPS database.
+- **Anywhere else, e.g. `npm run dev`**: only `TEST_SERVER_ID`, with your local database.
+
+So each server's settings, tickets, cases and XP roles live in that copy's own database, and running both copies at once never answers anything twice. The startup log says which server a copy handles. Settings you made for the production server from your PC before this existed stay in your local database; set them up again on the VPS. Without the matching ID, a copy handles every allowed server.
+
+### Server lock
+
+With **both** `TEST_SERVER_ID` and `PROD_SERVER_ID` set, the bot only works on those two servers. If someone adds it to another server, it leaves right away. At startup it leaves every other server it is still in, but only while it is in both of these servers, so a wrong ID can't make it leave the real one. Use the **same two IDs** in every `.env` that uses this bot token (your PC and the VPS): a copy with a wrong ID would leave the server that ID should name as soon as the bot joins it. The two IDs must differ. With only one ID or none, there is no lock.
 
 ## 🧭 Set it up in Discord
 
 1. Run **`/setup`** and set each item from the menu:
    - **Verification**: verification channel, Verified role, minimum account age (default 7 days, `0` turns the check off).
    - **Welcome & leave**: the welcome and leave channels (not set = no message) and their texts. Texts can use `{user}` (mention), `{name}` (display name), `{server}` and `{count}` (member count). **Use default** goes back to the built-in text. Only the new member is pinged, even if the text contains `@everyone`. Bots get no messages.
-   - **Tickets & applications**: ticket category, ticket log channel, staff roles, the application role that accepted applicants get, and the reminder and auto-close times. When staff wrote last and the opener stays quiet, the opener is reminded after the reminder time, and the ticket closes once the auto-close time has passed after that (default 24 + 24 hours). A reminder time of `0` turns both off; an auto-close time of `0` keeps only the reminder.
+   - **Tickets & applications**: ticket category, ticket log channel, staff roles, the application role that accepted applicants get, **Staff applications** on or off, and the reminder and auto-close times. With applications off, the Staff Application button on the ticket panel is greyed out ("Applications closed") and new applications are refused, even from older panels or forms that were already open. Application tickets that are already open carry on as usual. When staff wrote last and the opener stays quiet, the opener is reminded after the reminder time, and the ticket closes once the auto-close time has passed after that (default 24 + 24 hours). A reminder time of `0` turns both off; an auto-close time of `0` keeps only the reminder.
    - **Logs**: mod log channel and server log channel.
    - **Game**: the rank-up channel and the **XP roles** (see [XP roles](#xp-roles)).
 
    The dashboard warns you when the bot is missing permissions in a channel you pick.
 
 2. Run **`/verify-panel`**. It posts the panel in the verification channel.
-3. Run **`/ticket-panel`** in the channel where members should open tickets.
+3. Run **`/ticket-panel`** in the channel where members should open tickets. The bot updates the panel right away when you switch applications on or off. It remembers the newest panel; panels posted before that are found among the last 50 messages of each channel.
 4. Hide your normal channels from `@everyone` and allow the Verified role, so only verified members see them. Keep the welcome channel visible to `@everyone` if new members should see their greeting before they verify.
 
 ## 🚆 Game stats
@@ -175,13 +190,13 @@ curl -fsSL https://get.docker.com | sh
 # Get the code and configure it
 git clone https://github.com/Juqutsu/Railcore.git railcore && cd railcore
 cp .env.example .env
-nano .env                # set DISCORD_BOT_TOKEN and a strong POSTGRES_PASSWORD
+nano .env                # set DISCORD_BOT_TOKEN, both server IDs and a strong POSTGRES_PASSWORD
 
 # Build and start the bot and Postgres in the background
 docker compose up -d --build
 
-# Register the commands for every server (once, and again after command changes)
-docker compose run --rm bot node dist/scripts/deploy-commands.js --global
+# Register the commands on the production server (once, and again after command changes)
+docker compose run --rm bot node dist/scripts/deploy-commands.js --prod
 
 # Watch the logs
 docker compose logs -f bot
@@ -198,7 +213,9 @@ docker compose logs -f bot
 git pull
 docker compose up -d --build
 # only if commands changed:
-docker compose run --rm bot node dist/scripts/deploy-commands.js --global
+docker compose run --rm bot node dist/scripts/deploy-commands.js --prod
+# once, if you registered commands with --global before (otherwise they show up twice):
+docker compose run --rm bot node dist/scripts/deploy-commands.js --global --clear
 ```
 
 ### Backups
@@ -228,6 +245,7 @@ Use your own `POSTGRES_USER` / `POSTGRES_DB` if you changed them.
 | `npm run build`           | Generate the Prisma client and compile to `dist/`                      |
 | `npm start`               | Run the compiled bot from `dist/`                                      |
 | `npm run commands:dev`    | Register slash commands on the test server (`-- --clear` removes them) |
+| `npm run commands:prod`   | Register slash commands on the production server (`-- --clear` too)    |
 | `npm run commands:global` | Register slash commands globally                                       |
 | `npm run db:dev`          | Start the local PostgreSQL in the background                           |
 | `npm run db:stop`         | Stop the local PostgreSQL                                              |
@@ -271,16 +289,17 @@ prisma/
 
 ## 🩺 Troubleshooting
 
-| Symptom                                                                                | Fix                                                                                                                                                      |
-| -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Startup failed` with `Used disallowed intents`                                        | Turn on both privileged intents (see [Create the Discord bot](#create-the-discord-bot)).                                                                 |
-| `Startup failed` with `Can't reach database server` or `Connection terminated` (local) | The local database isn't running. Run `npm run db:dev`; if it still fails, look at `.dev-db/postgres.log`.                                               |
-| Users see "I'm missing a permission to do that"                                        | Check the bot's role position and its permissions in that channel. Picking a channel again in `/setup` tells you which permissions are missing.          |
-| A command is missing                                                                   | Register the commands again (see [Register the slash commands](#register-the-slash-commands)).                                                           |
-| Commands show up twice                                                                 | Registered on the test server and globally: run `npm run commands:dev -- --clear`.                                                                       |
-| Users see "Something went off the rails … Reference: `abc123`"                         | Search the logs for `"ref":"abc123"` (or `ref: "abc123"` locally) to find the full error.                                                                |
-| `/stats` says `api.blox.link` rejected the bot's API key                               | The log shows Bloxlink's reason. `Guild ID does not match API Key` means the key was made for another server: create one for the server the bot runs on. |
-| `/stats` says `apis.roblox.com` rejected the bot's API key                             | The Roblox key is expired, lacks read access to `FBR_Progress_v1`, or the server's IP isn't in its **Accepted IP Addresses**.                            |
+| Symptom                                                                                | Fix                                                                                                                                                                       |
+| -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Startup failed` with `Used disallowed intents`                                        | Turn on both privileged intents (see [Create the Discord bot](#create-the-discord-bot)).                                                                                  |
+| `Startup failed` with `Can't reach database server` or `Connection terminated` (local) | The local database isn't running. Run `npm run db:dev`; if it still fails, look at `.dev-db/postgres.log`.                                                                |
+| Users see "I'm missing a permission to do that"                                        | Check the bot's role position and its permissions in that channel. Picking a channel again in `/setup` tells you which permissions are missing.                           |
+| A command is missing                                                                   | Register the commands again (see [Register the slash commands](#register-the-slash-commands)).                                                                            |
+| Commands show up twice                                                                 | Registered on the server and globally: run `npm run commands:dev -- --clear` (or `commands:prod -- --clear`), or clear the global ones with `commands:global -- --clear`. |
+| The bot left a server right after joining                                              | The [server lock](#server-lock) is on and that server isn't `TEST_SERVER_ID` or `PROD_SERVER_ID`. Check both IDs in `.env`.                                               |
+| Users see "Something went off the rails … Reference: `abc123`"                         | Search the logs for `"ref":"abc123"` (or `ref: "abc123"` locally) to find the full error.                                                                                 |
+| `/stats` says `api.blox.link` rejected the bot's API key                               | The log shows Bloxlink's reason. `Guild ID does not match API Key` means the key was made for another server: create one for the server the bot runs on.                  |
+| `/stats` says `apis.roblox.com` rejected the bot's API key                             | The Roblox key is expired, lacks read access to `FBR_Progress_v1`, or the server's IP isn't in its **Accepted IP Addresses**.                                             |
 
 ## 📌 Known limitations
 

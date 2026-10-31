@@ -12,6 +12,7 @@ import { t } from '../text.js';
 import { embeds } from '../utils/embeds.js';
 import { logger } from '../utils/logger.js';
 import { getConfig } from './guildConfig.js';
+import { isServedGuild } from './guildLock.js';
 import { closeTicket } from './tickets.js';
 
 const CHECK_EVERY_MS = 10 * 60_000;
@@ -32,6 +33,8 @@ async function checkTickets(client: Client<true>): Promise<void> {
   for (const ticket of tickets) {
     // A pending application waits on staff, not on the applicant.
     if (ticket.appStatus === 'PENDING' || !ticket.channelId) continue;
+    // The other copy (test or production) handles its own server's tickets.
+    if (!isServedGuild(ticket.guildId)) continue;
     const guild = client.guilds.cache.get(ticket.guildId);
     const channel = guild?.channels.cache.get(ticket.channelId);
     if (!guild || channel?.type !== ChannelType.GuildText) continue;

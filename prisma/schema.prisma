@@ -32,6 +32,11 @@ model GuildConfig {
   leaveChannelId        String?
   /// Custom leave text, same placeholders; null = default text.
   leaveMessage          String?
+  /// Off greys out the Staff Application button and refuses new applications.
+  applicationsOpen      Boolean  @default(true)
+  /// The last ticket panel posted, so toggling applications can update it in place.
+  ticketPanelChannelId  String?
+  ticketPanelMessageId  String?
   /// Where rank-ups from XP roles are announced; null = not announced.
   rankUpChannelId       String?
   /// Start of the last full Bloxlink pass for XP roles; it runs daily to find new links.

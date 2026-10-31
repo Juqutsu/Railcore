@@ -120,8 +120,11 @@ export const t = {
 
   tickets: {
     panelTitle: 'Need a hand?',
-    panelBody:
-      'Pick what fits best and we will open a private channel with our staff.\n\n🛟 **Support**: questions, problems or anything else\n🐞 **Bug Report**: something broken in the game\n📋 **Staff Application**: join the Falkenberg Railways team',
+    panelBody: (applicationsOpen: boolean) =>
+      `Pick what fits best and we will open a private channel with our staff.\n\n🛟 **Support**: questions, problems or anything else\n🐞 **Bug Report**: something broken in the game\n📋 **Staff Application**: ${applicationsOpen ? 'join the Falkenberg Railways team' : 'closed right now'}`,
+    applicationsClosedLabel: 'Applications closed',
+    applicationsClosed:
+      'Staff applications are closed right now. Keep an eye on the announcements for when they open again.',
     types: {
       SUPPORT: {
         label: 'Support',
@@ -534,6 +537,15 @@ export const t = {
     savedMissingPerms: (label: string, channel: string, perms: string) =>
       `⚠️ Saved **${label}**, but I'm missing **${perms}** in ${channel}. Fix that, or I can't work there.`,
     hours: (n: number) => (n === 0 ? 'Off' : `${n} hour${n === 1 ? '' : 's'}`),
+    on: '`On`',
+    off: '`Off`',
+    turnOn: 'Turn on',
+    turnOff: 'Turn off',
+    switched: (label: string, on: boolean) => `✅ **${label}** ${on ? 'on' : 'off'}.`,
+    panelUpdated: (count: number) =>
+      count === 1 ? 'The ticket panel was updated.' : `${count} ticket panels were updated.`,
+    panelNotFound:
+      "I couldn't find the ticket panel to update. Run `/ticket-panel` to post a new one.",
     units: { days: 'Days', hours: 'Hours' },
     numberHint: (max: number) => `Whole number from 0 to ${max}. 0 turns it off.`,
     invalidNumber: (max: number) => `Enter a whole number from 0 to ${max}.`,
@@ -589,6 +601,10 @@ export const t = {
       applicationRoleId: {
         label: 'Application role',
         description: 'Given when a staff application is accepted.',
+      },
+      applicationsOpen: {
+        label: 'Staff applications',
+        description: 'Off greys out the Staff Application button on the ticket panel.',
       },
       ticketReminderHours: {
         label: 'Ticket reminder',

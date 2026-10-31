@@ -4,6 +4,7 @@ import { prisma } from '../database/client.js';
 import { env } from '../env.js';
 import { logger } from '../utils/logger.js';
 import { getConfig, updateConfig } from './guildConfig.js';
+import { isServedGuild } from './guildLock.js';
 import { isKeyRejected, linkAndXp, xpOf } from './roblox.js';
 import { applyXp, tiersOf } from './xpRoles.js';
 
@@ -29,7 +30,8 @@ export function startXpRoleSync(client: Client<true>): void {
 
 async function syncAll(client: Client<true>): Promise<void> {
   for (const guild of client.guilds.cache.values()) {
-    if (!(await tiersOf(guild.id)).length) continue;
+    // The other copy (test or production) syncs its own server.
+    if (!isServedGuild(guild.id) || !(await tiersOf(guild.id)).length) continue;
     const { xpRolesSyncedAt } = await getConfig(guild.id);
     const fullPassDue =
       !xpRolesSyncedAt || Date.now() - xpRolesSyncedAt.getTime() > FULL_PASS_EVERY_MS;

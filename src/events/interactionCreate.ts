@@ -13,7 +13,8 @@ import { handleInteractionError, UserError } from '../utils/errors.js';
 export default defineEvent({
   name: Events.InteractionCreate,
   async execute(interaction) {
-    // Every command is guild-only and every component lives in a guild message.
+    // Every command is guild-only and every component lives in a guild message. Other servers'
+    // interactions never get here: handlers.ts drops them (see services/guildLock.ts).
     if (!interaction.inCachedGuild()) return;
 
     try {
