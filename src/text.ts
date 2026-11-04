@@ -121,7 +121,7 @@ export const t = {
   tickets: {
     panelTitle: 'Need a hand?',
     panelBody: (applicationsOpen: boolean) =>
-      `Pick what fits best and we will open a private channel with our staff.\n\n🛟 **Support**: questions, problems or anything else\n🐞 **Bug Report**: something broken in the game\n📋 **Staff Application**: ${applicationsOpen ? 'join the Falkenberg Railways team' : 'closed right now'}`,
+      `Pick what fits best and we will open a private channel with our staff.\n\n🛟 **Support**: questions, problems or anything else\n📋 **Staff Application**: ${applicationsOpen ? 'join the Falkenberg Railways team' : 'closed right now'}`,
     applicationsClosedLabel: 'Applications closed',
     applicationsClosed:
       'Staff applications are closed right now. Keep an eye on the announcements for when they open again.',

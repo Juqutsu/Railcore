@@ -73,13 +73,15 @@ const QUESTIONS: { [K in TicketType]: (Question & { id: QuestionIds[K] })[] } = 
   REPORT: [{ id: 'details', long: true, optional: true, max: 1000 }],
 };
 
-/** The types members can open from the ticket panel. */
-const PANEL_TYPES = ['SUPPORT', 'BUG_REPORT', 'APPLICATION'] as const satisfies TicketType[];
+/**
+ * The types members can open from the ticket panel. BUG_REPORT is retired (bugs go to a forum
+ * thread) but stays in the enum and texts so old bug tickets still close and render.
+ */
+const PANEL_TYPES = ['SUPPORT', 'APPLICATION'] as const satisfies TicketType[];
 type PanelType = (typeof PANEL_TYPES)[number];
 
 const BUTTON_STYLES: Record<PanelType, ButtonStyle> = {
   SUPPORT: ButtonStyle.Primary,
-  BUG_REPORT: ButtonStyle.Secondary,
   APPLICATION: ButtonStyle.Success,
 };
 
