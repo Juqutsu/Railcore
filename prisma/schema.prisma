@@ -79,6 +79,7 @@ enum TicketType {
   BUG_REPORT
   APPLICATION
   REPORT
+  PLAYER_REPORT
 }
 
 enum TicketStatus {
@@ -116,10 +117,13 @@ model Ticket {
   /// The inactivity reminder, while it is still the latest message in the channel.
   reminderMessageId String?
   remindedAt   DateTime?
+  /// Player reports: the reported Roblox account, so later reports can show how often it was reported.
+  reportedRobloxId String?
   createdAt    DateTime           @default(now())
   closedAt     DateTime?
 
   @@unique([guildId, number])
+  @@index([guildId, reportedRobloxId])
 }
 
 enum CaseAction {

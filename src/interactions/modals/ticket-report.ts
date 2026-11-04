@@ -12,12 +12,9 @@ export default defineComponent({
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const details = readAnswers('REPORT', (id) => interaction.fields.getTextInputValue(id));
     // The reported author never sees the report, even if they are staff.
-    const channel = await openTicket(
-      interaction.member,
-      'REPORT',
-      [...answers, ...details],
-      authorId,
-    );
+    const channel = await openTicket(interaction.member, 'REPORT', [...answers, ...details], {
+      hideFrom: authorId,
+    });
     await interaction.editReply({
       embeds: [embeds.success(t.tickets.openedTitle, t.tickets.opened(channel.toString()))],
     });

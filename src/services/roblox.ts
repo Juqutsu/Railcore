@@ -127,6 +127,19 @@ const headshotOf = cached(60 * 60_000, async (robloxId) => {
   return typeof first.imageUrl === 'string' && first.imageUrl ? first.imageUrl : null;
 });
 
+/** Key is a lowercased username. The account with exactly that username, or null. */
+const userByName = cached(10 * 60_000, async (username) => {
+  const body = await getJson('https://users.roblox.com/v1/usernames/users', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ usernames: [username], excludeBannedUsers: false }),
+  });
+  const user: unknown = isRecord(body) && Array.isArray(body.data) ? body.data[0] : null;
+  if (!isRecord(user) || typeof user.id !== 'number' || typeof user.name !== 'string') return null;
+  const displayName = typeof user.displayName === 'string' ? user.displayName : user.name;
+  return { robloxId: String(user.id), name: user.name, displayName };
+});
+
 /** Display names for many players in one request. Missing ones are left out. */
 async function displayNames(robloxIds: string[]): Promise<Map<string, string>> {
   const body = await getJson('https://users.roblox.com/v1/users', {
@@ -196,6 +209,45 @@ export async function linkAndXp(
 const count = (n: number) => n.toLocaleString('en-US');
 const km = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 1 });
 const profileUrl = (robloxId: string) => `https://www.roblox.com/users/${robloxId}/profile`;
+
+export type RobloxAccount = { robloxId: string; name: string; displayName: string; url: string };
+
+/**
+ * The account a player report names, with its headshot. A failed lookup counts as not found, so a
+ * Roblox outage never blocks a report.
+ */
+export async function findRobloxUser(
+  input: string,
+): Promise<(RobloxAccount & { headshot: string | null }) | null> {
+  const username = input.trim().replace(/^@/, '');
+  // Roblox usernames are 3 to 20 letters, digits and underscores.
+  if (!/^\w{3,20}$/.test(username)) return null;
+  try {
+    const user = await userByName(username.toLowerCase());
+    if (!user) return null;
+    const headshot = await headshotOf(user.robloxId).catch(() => null);
+    return { ...user, url: profileUrl(user.robloxId), headshot };
+  } catch (err) {
+    logger.warn({ err, username }, 'Roblox username lookup failed');
+    return null;
+  }
+}
+
+/** The member's Roblox account from Bloxlink, or null if not linked, not set up or unreachable. */
+export async function linkedAccount(
+  guildId: string,
+  userId: string,
+): Promise<RobloxAccount | null> {
+  if (!env.BLOXLINK_API_KEY) return null;
+  try {
+    const robloxId = await linkedRobloxId(`${guildId}:${userId}`);
+    const profile = robloxId ? await robloxUserOf(robloxId) : null;
+    return robloxId && profile ? { robloxId, ...profile, url: profileUrl(robloxId) } : null;
+  } catch (err) {
+    logger.warn({ err, userId }, 'Bloxlink lookup for a report failed');
+    return null;
+  }
+}
 
 export async function statsReply(
   guild: Guild,

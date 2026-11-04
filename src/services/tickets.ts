@@ -6,10 +6,12 @@ import {
   ButtonStyle,
   ChannelType,
   ComponentType,
+  FileUploadBuilder,
   LabelBuilder,
   ModalBuilder,
   OverwriteType,
   PermissionFlagsBits,
+  StringSelectMenuBuilder,
   TextInputBuilder,
   TextInputStyle,
   time,
@@ -47,7 +49,18 @@ import {
 } from './transcript.js';
 
 export type Answer = { label: string; value: string };
-type Question = { id: string; long?: boolean; optional?: boolean; max: number };
+type Question =
+  | { id: string; kind?: 'text'; long?: boolean; optional?: boolean; max: number }
+  /** One required pick from the question's `options` in text.ts. */
+  | { id: string; kind: 'select' }
+  /** Optional files; `max` is how many. */
+  | { id: string; kind: 'files'; max: number };
+type QuestionText = {
+  label: string;
+  placeholder?: string;
+  description?: string;
+  options?: Record<string, { label: string; description: string }>;
+};
 type QuestionIds = { [K in TicketType]: keyof (typeof t.tickets.questions)[K] };
 
 const QUESTIONS: { [K in TicketType]: (Question & { id: QuestionIds[K] })[] } = {
@@ -69,6 +82,14 @@ const QUESTIONS: { [K in TicketType]: (Question & { id: QuestionIds[K] })[] } = 
     { id: 'experience', long: true, max: 1000 },
     { id: 'why', long: true, max: 1000 },
   ],
+  // Discord allows at most 5 questions per form. Read by playerReports.ts, not readAnswers.
+  PLAYER_REPORT: [
+    { id: 'roblox', max: 50 },
+    { id: 'reason', kind: 'select' },
+    { id: 'what', long: true, max: 1000 },
+    { id: 'evidence', kind: 'files', max: 10 },
+    { id: 'link', optional: true, max: 200 },
+  ],
   // Opened from a message's context menu, not the panel.
   REPORT: [{ id: 'details', long: true, optional: true, max: 1000 }],
 };
@@ -77,11 +98,12 @@ const QUESTIONS: { [K in TicketType]: (Question & { id: QuestionIds[K] })[] } = 
  * The types members can open from the ticket panel. BUG_REPORT is retired (bugs go to a forum
  * thread) but stays in the enum and texts so old bug tickets still close and render.
  */
-const PANEL_TYPES = ['SUPPORT', 'APPLICATION'] as const satisfies TicketType[];
+const PANEL_TYPES = ['SUPPORT', 'PLAYER_REPORT', 'APPLICATION'] as const satisfies TicketType[];
 type PanelType = (typeof PANEL_TYPES)[number];
 
 const BUTTON_STYLES: Record<PanelType, ButtonStyle> = {
   SUPPORT: ButtonStyle.Primary,
+  PLAYER_REPORT: ButtonStyle.Danger,
   APPLICATION: ButtonStyle.Success,
 };
 
@@ -113,7 +135,7 @@ const openKey = (guildId: string, userId: string, type: TicketType) =>
   `${guildId}:${userId}:${type}`;
 const questionsOf = (type: TicketType): Question[] => QUESTIONS[type];
 const questionText = (type: TicketType, id: string) =>
-  (t.tickets.questions[type] as Record<string, { label: string; placeholder: string }>)[id]!;
+  (t.tickets.questions[type] as Record<string, QuestionText>)[id]!;
 
 export const isPanelType = (value: string | undefined): value is PanelType =>
   (PANEL_TYPES as readonly string[]).includes(value ?? '');
@@ -207,14 +229,33 @@ export function ticketModal(type: TicketType, customId = `ticket:create:${type}`
     .addLabelComponents(
       questionsOf(type).map((question) => {
         const text = questionText(type, question.id);
-        return new LabelBuilder().setLabel(text.label).setTextInputComponent(
-          new TextInputBuilder()
-            .setCustomId(question.id)
-            .setStyle(question.long ? TextInputStyle.Paragraph : TextInputStyle.Short)
-            .setPlaceholder(text.placeholder)
-            .setMaxLength(question.max)
-            .setRequired(!question.optional),
-        );
+        const label = new LabelBuilder().setLabel(text.label);
+        if (text.description) label.setDescription(text.description);
+        if (question.kind === 'select') {
+          const options = Object.entries(text.options ?? {});
+          return label.setStringSelectMenuComponent(
+            new StringSelectMenuBuilder()
+              .setCustomId(question.id)
+              .setPlaceholder(text.placeholder ?? '')
+              .addOptions(options.map(([value, option]) => ({ value, ...option }))),
+          );
+        }
+        if (question.kind === 'files') {
+          return label.setFileUploadComponent(
+            new FileUploadBuilder()
+              .setCustomId(question.id)
+              .setMinValues(0)
+              .setMaxValues(question.max)
+              .setRequired(false),
+          );
+        }
+        const input = new TextInputBuilder()
+          .setCustomId(question.id)
+          .setStyle(question.long ? TextInputStyle.Paragraph : TextInputStyle.Short)
+          .setMaxLength(question.max)
+          .setRequired(!question.optional);
+        if (text.placeholder) input.setPlaceholder(text.placeholder);
+        return label.setTextInputComponent(input);
       }),
     );
 }
@@ -362,12 +403,20 @@ export async function assertCanOpen(member: GuildMember, type: TicketType) {
   return setup;
 }
 
-/** `hideFrom` keeps one member out even if they hold a staff role, e.g. the author of a reported message. */
+export type TicketExtras = {
+  /** Keeps one member out even if they hold a staff role, e.g. the author of a reported message. */
+  hideFrom?: string;
+  /** Shown in the opening message instead of the opener's avatar. */
+  thumbnail?: string;
+  /** Player reports: the reported Roblox account, so later reports can count it. */
+  reportedRobloxId?: string;
+};
+
 export async function openTicket(
   member: GuildMember,
   type: TicketType,
   answers: Answer[],
-  hideFrom?: string,
+  extras: TicketExtras = {},
 ): Promise<TextChannel> {
   const { guild } = member;
   const { category, staffRoleIds } = await assertCanOpen(member, type);
@@ -375,7 +424,7 @@ export async function openTicket(
   const wait = opened.take(cooldownKey);
   if (wait) throw cooldownError(wait);
   try {
-    return await createTicket(member, type, answers, category, staffRoleIds, hideFrom);
+    return await createTicket(member, type, answers, category, staffRoleIds, extras);
   } catch (err) {
     opened.clear(cooldownKey); // nothing was opened, so nothing pinged staff
     throw err;
@@ -388,7 +437,7 @@ async function createTicket(
   answers: Answer[],
   category: CategoryChannel,
   staffRoleIds: string[],
-  hideFrom?: string,
+  { hideFrom, thumbnail, reportedRobloxId }: TicketExtras,
 ): Promise<TextChannel> {
   const { guild } = member;
   const hidden =
@@ -415,6 +464,7 @@ async function createTicket(
         answers,
         openKey: openKey(guild.id, member.id, type),
         appStatus: type === 'APPLICATION' ? 'PENDING' : null,
+        reportedRobloxId,
       },
     });
   } catch (err) {
@@ -458,7 +508,7 @@ async function createTicket(
     where: { id: ticket.id },
     data: { channelId: channel.id },
   });
-  await channel.send(openingMessage(ticket, member.user, staffRoleIds));
+  await channel.send(openingMessage(ticket, member.user, staffRoleIds, thumbnail));
   return channel;
 }
 
@@ -466,12 +516,13 @@ function openingMessage(
   ticket: Ticket,
   opener: User,
   staffRoleIds: string[],
+  thumbnail = opener.displayAvatarURL(),
 ): MessageCreateOptions {
   const { title } = t.tickets.types[ticket.type];
   const answers = ticket.answers as Answer[];
   const embed = embeds
     .info(`${title} #${pad(ticket.number)}`, t.tickets.types[ticket.type].intro)
-    .setThumbnail(opener.displayAvatarURL())
+    .setThumbnail(thumbnail)
     .addFields(
       { name: t.tickets.openedBy, value: userLine(opener.id) },
       ...answers.map((answer) => ({ name: answer.label, value: answer.value || '—' })),

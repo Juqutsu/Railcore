@@ -4,3 +4,4 @@ src/generated/
 .env
 .dev-db/
 *.log
+.superpowers/

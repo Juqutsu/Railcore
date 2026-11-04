@@ -121,7 +121,7 @@ export const t = {
   tickets: {
     panelTitle: 'Need a hand?',
     panelBody: (applicationsOpen: boolean) =>
-      `Pick what fits best and we will open a private channel with our staff.\n\n🛟 **Support**: questions, problems or anything else\n📋 **Staff Application**: ${applicationsOpen ? 'join the Falkenberg Railways team' : 'closed right now'}`,
+      `Pick what fits best and we will open a private channel with our staff.\n\n🛟 **Support**: questions, problems or anything else\n🚨 **Player Report**: someone breaking the rules in the game\n📋 **Staff Application**: ${applicationsOpen ? 'join the Falkenberg Railways team' : 'closed right now'}`,
     applicationsClosedLabel: 'Applications closed',
     applicationsClosed:
       'Staff applications are closed right now. Keep an eye on the announcements for when they open again.',
@@ -147,6 +147,13 @@ export const t = {
         title: 'Staff application',
         intro: 'Thanks for applying! Staff will review your answers and get back to you here.',
       },
+      PLAYER_REPORT: {
+        label: 'Player Report',
+        emoji: '🚨',
+        channel: 'player-report',
+        title: 'Player report',
+        intro: 'Thanks for the report! Staff will look into it and may ask you questions here.',
+      },
       REPORT: {
         label: 'Report',
         emoji: '🚩',
@@ -155,7 +162,7 @@ export const t = {
         intro: 'Thanks for the report! Staff will take a look and may ask you questions here.',
       },
     },
-    /** Modal questions. Labels: max 45 characters, placeholders: max 100. */
+    /** Modal questions. Labels: max 45 characters, placeholders and descriptions: max 100. */
     questions: {
       SUPPORT: {
         subject: { label: 'What do you need help with?', placeholder: 'A short summary' },
@@ -179,6 +186,43 @@ export const t = {
         why: {
           label: 'Why should we pick you?',
           placeholder: 'Tell us what you would bring to the team',
+        },
+      },
+      PLAYER_REPORT: {
+        roblox: {
+          label: 'Roblox username',
+          description: 'The player you are reporting',
+          placeholder: 'Their username, not the display name',
+        },
+        reason: {
+          label: 'Reason',
+          placeholder: 'Pick what fits best',
+          options: {
+            exploiting: {
+              label: 'Exploiting / cheating',
+              description: 'Hacks, scripts, glitch abuse',
+            },
+            trolling: {
+              label: 'Trolling / griefing',
+              description: 'Blocking tracks, ruining rides',
+            },
+            harassment: { label: 'Harassment', description: 'Insults, threats, hate' },
+            inappropriate: {
+              label: 'Inappropriate behaviour',
+              description: 'Chat, names, avatars',
+            },
+            other: { label: 'Something else', description: 'Explain it below' },
+          },
+        },
+        what: {
+          label: 'What happened?',
+          placeholder: 'When and where it happened, and what they did',
+        },
+        evidence: { label: 'Evidence', description: 'Screenshots or videos, up to 10 files' },
+        link: {
+          label: 'Video link',
+          description: 'For clips too big to upload',
+          placeholder: 'YouTube, Medal, Streamable…',
         },
       },
       REPORT: {
@@ -206,6 +250,19 @@ export const t = {
     reportLink: 'Link',
     reportJump: 'Jump to message',
     reportAttachments: 'Attachments',
+    reportedPlayer: 'Reported player',
+    reportedBefore: (count: number) =>
+      count === 0
+        ? 'First report on this player'
+        : count === 1
+          ? 'Reported once before'
+          : `Reported ${count} times before`,
+    robloxNotFound: (typed: string) => `${typed} · ⚠️ Couldn't find this account on Roblox`,
+    reporterRoblox: 'Reporter on Roblox',
+    evidenceTitle: 'Evidence',
+    evidenceFrom: (user: string) => `Uploaded by ${user} with the report.`,
+    evidenceLinks: (links: string) =>
+      `Couldn't upload these here. The links expire after about a day:\n${links}`,
     reportOwn: "You can't report your own message.",
     reportExpired: 'This report form expired. Please right-click the message and report it again.',
     openedBy: 'Opened by',
