@@ -140,12 +140,38 @@ const userByName = cached(10 * 60_000, async (username) => {
   return { robloxId: String(user.id), name: user.name, displayName };
 });
 
-/** How many people are in the game right now, from the public games API (no key needed). */
-export async function playersOnline(): Promise<number | null> {
+export type GameInfo = { name: string; playing: number; updated: Date; url: string };
+
+/** The game's live state from the public games API (no key needed); null if the answer looks off. */
+export async function gameInfo(): Promise<GameInfo | null> {
   const body = await getJson(`https://games.roblox.com/v1/games?universeIds=${UNIVERSE_ID}`);
   const game: unknown = isRecord(body) && Array.isArray(body.data) ? body.data[0] : null;
-  return isRecord(game) && typeof game.playing === 'number' ? game.playing : null;
+  if (
+    !isRecord(game) ||
+    typeof game.name !== 'string' ||
+    typeof game.playing !== 'number' ||
+    typeof game.updated !== 'string' ||
+    typeof game.rootPlaceId !== 'number'
+  ) {
+    return null;
+  }
+  const updated = new Date(game.updated);
+  if (Number.isNaN(updated.getTime())) return null;
+  const url = `https://www.roblox.com/games/${game.rootPlaceId}`;
+  return { name: game.name, playing: game.playing, updated, url };
 }
+
+const gameIconOf = cached(60 * 60_000, async () => {
+  const body = await getJson(
+    `https://thumbnails.roblox.com/v1/games/icons?universeIds=${UNIVERSE_ID}&size=256x256&format=Png`,
+  );
+  const first: unknown = isRecord(body) && Array.isArray(body.data) ? body.data[0] : null;
+  if (!isRecord(first) || first.state !== 'Completed') return null;
+  return typeof first.imageUrl === 'string' && first.imageUrl ? first.imageUrl : null;
+});
+
+/** The game's icon URL, or null; cosmetic, so it never throws. */
+export const gameIcon = () => gameIconOf('icon').catch(() => null);
 
 /** Display names for many players in one request. Missing ones are left out. */
 async function displayNames(robloxIds: string[]): Promise<Map<string, string>> {

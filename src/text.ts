@@ -27,6 +27,7 @@ export const t = {
     ticket: 'Manage who can see this ticket',
     ticketAdd: 'Give a member access to this ticket',
     ticketRemove: "Remove a member's access to this ticket",
+    reports: 'Staff: list the player reports on a Roblox account',
     warn: 'Warn a member',
     warnings: "Show a member's active warnings",
     clearwarn: 'Clear one or all warnings of a member',
@@ -59,6 +60,7 @@ export const t = {
     purgeUser: 'Only delete messages from this user',
     userId: 'ID of the banned user',
     ticketUser: 'The member',
+    reportsPlayer: 'Roblox username of the player',
     statsUser: 'Whose stats to show (default: you)',
     leaderboardBy: 'What to rank by (default: XP)',
   },
@@ -579,6 +581,27 @@ export const t = {
     hint: 'Channel name. Placeholder: {count}. Empty = default name.',
   },
 
+  reports: {
+    title: (displayName: string, name: string) => `Reports on ${displayName} (@${name})`,
+    count: (count: number) => (count === 1 ? 'Reported once' : `Reported ${count} times`),
+    none: 'No player reports on this account yet.',
+    line: (number: string, date: string, reason: string, by: string, state: string) =>
+      `**#${number}** · ${date} · ${reason} · by ${by} · ${state}`,
+    open: (channel: string) => `🟢 open → ${channel}`,
+    closed: '🔒 closed',
+    older: (count: number) => `…and ${count} older`,
+    notFound: (name: string) => `Couldn't find a Roblox account named **${name}**.`,
+  },
+
+  gameUpdates: {
+    title: (game: string) => `🚆 ${game} was updated!`,
+    defaultMessage: 'Hop on and check it out!',
+    updated: 'Updated',
+    play: 'Play now',
+    placeholders: 'No placeholders, but Markdown works.',
+    hint: 'Shown under the title. Empty = default text.',
+  },
+
   setup: {
     title: 'Railcore setup',
     intro: 'Pick a setting below to change it. Changes save instantly.',
@@ -590,10 +613,12 @@ export const t = {
       tickets: 'Tickets & applications',
       logs: 'Logs',
       stats: 'Server stats',
+      updates: 'Game updates',
       game: 'Game',
     },
     xpRolesHint: 'pick *XP roles* in the menu below',
     pickPlaceholder: 'Choose a setting to change…',
+    pickGamePlaceholder: 'Server stats, game updates and XP roles…',
     editTitle: (label: string) => `Setup · ${label}`,
     current: 'Current',
     channelPlaceholder: 'Select a channel…',
@@ -608,6 +633,8 @@ export const t = {
     cleared: (label: string) => `✅ Cleared **${label}**.`,
     savedMissingPerms: (label: string, channel: string, perms: string) =>
       `⚠️ Saved **${label}**, but I'm missing **${perms}** in ${channel}. Fix that, or I can't work there.`,
+    savedNoPing: (label: string, role: string) =>
+      `⚠️ Saved **${label}**, but I can't ping ${role}. Make the role mentionable, or give me **Mention @everyone, @here and All Roles**.`,
     hours: (n: number) => (n === 0 ? 'Off' : `${n} hour${n === 1 ? '' : 's'}`),
     on: '`On`',
     off: '`Off`',
@@ -719,6 +746,22 @@ export const t = {
       boostCountChannelId: {
         label: 'Boost count channel',
         description: 'Voice channel renamed to the number of server boosts every 10 minutes.',
+      },
+      gameUpdatesOn: {
+        label: 'Game update posts',
+        description: 'Posts in the update channel when the game is updated.',
+      },
+      gameUpdateChannelId: {
+        label: 'Update channel',
+        description: 'Where game updates are announced, e.g. your changelog.',
+      },
+      gameUpdatePingRoleId: {
+        label: 'Update ping role',
+        description: 'Pinged with each update post. Not set = no ping.',
+      },
+      gameUpdateMessage: {
+        label: 'Update message',
+        description: 'Text of the update post.',
       },
       boostCountName: {
         label: 'Boost count name',

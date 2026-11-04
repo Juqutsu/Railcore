@@ -30,6 +30,17 @@ export default defineComponent({
       const roles = [...interaction.roles.values()];
       if (setting.kind === 'roles') {
         patch = { [key]: roles.map((role) => role.id) };
+      } else if (setting.kind === 'pingRole') {
+        const [role] = roles;
+        if (!role) throw new UserError(t.errors.unknownInteraction);
+        patch = { [key]: role.id };
+        // Otherwise Discord posts the mention without pinging anyone.
+        if (
+          !role.mentionable &&
+          !interaction.guild.members.me?.permissions.has('MentionEveryone')
+        ) {
+          notice = t.setup.savedNoPing(label, role.toString());
+        }
       } else {
         const [role] = roles;
         if (!role) throw new UserError(t.errors.unknownInteraction);

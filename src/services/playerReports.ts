@@ -1,6 +1,9 @@
 import {
   escapeMarkdown,
+  time,
+  TimestampStyles,
   type Attachment,
+  type BaseMessageOptions,
   type GuildMember,
   type ModalSubmitFields,
   type TextChannel,
@@ -8,9 +11,50 @@ import {
 import { prisma } from '../database/client.js';
 import { t } from '../text.js';
 import { embeds } from '../utils/embeds.js';
+import { UserError } from '../utils/errors.js';
 import { logger } from '../utils/logger.js';
 import { findRobloxUser, linkedAccount, type RobloxAccount } from './roblox.js';
-import { openTicket, type Answer } from './tickets.js';
+import { openTicket, pad, type Answer } from './tickets.js';
+
+/** /reports shows this many, newest first. */
+// ponytail: no paging; add buttons like /leaderboard if a player ever gets more than 20 reports.
+const HISTORY_LIMIT = 20;
+
+/** Staff view of every player report on one Roblox account, found by ID so renames don't hide any. */
+export async function reportHistory(guildId: string, typed: string): Promise<BaseMessageOptions> {
+  const player = await findRobloxUser(typed);
+  if (!player) throw new UserError(t.reports.notFound(escapeMarkdown(typed.trim())));
+  const where = { guildId, type: 'PLAYER_REPORT' as const, reportedRobloxId: player.robloxId };
+  const [total, tickets] = await Promise.all([
+    prisma.ticket.count({ where }),
+    prisma.ticket.findMany({ where, orderBy: { createdAt: 'desc' }, take: HISTORY_LIMIT }),
+  ]);
+  const reasonLabel = t.tickets.questions.PLAYER_REPORT.reason.label;
+  const lines = tickets.map((ticket) => {
+    const answers = ticket.answers as Answer[];
+    const reason = answers.find((answer) => answer.label === reasonLabel)?.value || '—';
+    const state =
+      ticket.status === 'OPEN' && ticket.channelId
+        ? t.reports.open(`<#${ticket.channelId}>`)
+        : t.reports.closed;
+    return t.reports.line(
+      pad(ticket.number),
+      time(ticket.createdAt, TimestampStyles.ShortDate),
+      reason,
+      `<@${ticket.openerId}>`,
+      state,
+    );
+  });
+  if (total > tickets.length) lines.push(t.reports.older(total - tickets.length));
+  const embed = embeds
+    .info(
+      t.reports.title(player.displayName, player.name),
+      total ? `${t.reports.count(total)}\n\n${lines.join('\n')}` : t.reports.none,
+    )
+    .setURL(player.url);
+  if (player.headshot) embed.setThumbnail(player.headshot);
+  return { embeds: [embed] };
+}
 
 // ponytail: the upload limit of servers without boosts; read guild.premiumTier if boosted servers
 // should keep bigger videos as files too.

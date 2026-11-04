@@ -2,9 +2,10 @@ import { ActivityType, ChannelType, type Client, type Guild } from 'discord.js';
 import { t } from '../text.js';
 import { logger } from '../utils/logger.js';
 import { fillChannelName } from '../utils/template.js';
+import { checkGameUpdate } from './gameUpdates.js';
 import { getConfig } from './guildConfig.js';
 import { isServedGuild } from './guildLock.js';
-import { playersOnline } from './roblox.js';
+import { gameInfo } from './roblox.js';
 
 const POLL_EVERY_MS = 10 * 60_000;
 /** Discord allows 2 renames per channel in 10 minutes; more would wait on its rate limit. */
@@ -48,7 +49,10 @@ export const SERVER_STATS_KEYS: readonly string[] = STATS.flatMap((stat) => [
   stat.name,
 ]);
 
-/** Every 10 minutes, and once at startup: renames the stat channels and shows players in the bot status. */
+/**
+ * Every 10 minutes, and once at startup: one look at the game feeds the stat channels, the bot
+ * status and the update posts.
+ */
 export function startServerStats(client: Client<true>): void {
   const run = () =>
     void poll(client).catch((err: unknown) => logger.warn({ err }, 'Server stats update failed'));
@@ -58,18 +62,24 @@ export function startServerStats(client: Client<true>): void {
 
 async function poll(client: Client<true>): Promise<void> {
   // When Roblox doesn't answer, the player count stays as it was rather than showing a wrong one.
-  const players = await playersOnline().catch((err: unknown) => {
-    logger.warn({ err }, 'Player count lookup failed');
+  const game = await gameInfo().catch((err: unknown) => {
+    logger.warn({ err }, 'Game lookup failed');
     return null;
   });
-  if (players !== null) {
-    lastPlayers = players;
-    client.user.setActivity(players ? t.serverStats.presence(players) : t.presence, {
+  if (game) {
+    lastPlayers = game.playing;
+    client.user.setActivity(game.playing ? t.serverStats.presence(game.playing) : t.presence, {
       type: ActivityType.Watching,
     });
   }
   for (const guild of client.guilds.cache.values()) {
-    if (isServedGuild(guild.id)) refreshServerStats(guild);
+    if (!isServedGuild(guild.id)) continue;
+    refreshServerStats(guild);
+    if (game) {
+      void checkGameUpdate(guild, game).catch((err: unknown) =>
+        logger.warn({ err, guildId: guild.id }, 'Game update check failed'),
+      );
+    }
   }
 }
 

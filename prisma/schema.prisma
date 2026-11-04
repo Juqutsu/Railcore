@@ -51,6 +51,17 @@ model GuildConfig {
   /// Voice channel renamed to the number of server boosts; null = off.
   boostCountChannelId   String?
   boostCountName        String?
+  /// Posts in gameUpdateChannelId when the game is published.
+  gameUpdatesOn         Boolean  @default(false)
+  gameUpdateChannelId   String?
+  /// Pinged with each update post; null = no ping.
+  gameUpdatePingRoleId  String?
+  /// Custom text of the update post; null = default text.
+  gameUpdateMessage     String?
+  /// The game's last publish time the bot saw, tracked even while posts are off.
+  gameUpdatedAt         DateTime?
+  /// Last update post, so a burst of hotfixes gives one post per hour.
+  gameUpdateAnnouncedAt DateTime?
   updatedAt             DateTime @updatedAt
 }
 

@@ -35,7 +35,8 @@ type TextSetting = {
 };
 type Setting =
   | { kind: 'channel' | 'category' | 'voice'; permissions: PermissionsString[] }
-  | { kind: 'role' | 'roles' | 'toggle' }
+  /** `pingRole`: only mentioned, never handed out, so the bot needn't be above it. */
+  | { kind: 'role' | 'roles' | 'toggle' | 'pingRole' }
   | NumberSetting
   | TextSetting;
 
@@ -77,6 +78,16 @@ export const SETTINGS: Record<SettingKey, Setting> = {
   playerCountName: statName(t.serverStats.defaults.players),
   boostCountChannelId: { kind: 'voice', permissions: RENAME },
   boostCountName: statName(t.serverStats.defaults.boosts),
+  gameUpdatesOn: { kind: 'toggle' },
+  gameUpdateChannelId: { kind: 'channel', permissions: POST },
+  gameUpdatePingRoleId: { kind: 'pingRole' },
+  gameUpdateMessage: {
+    kind: 'text',
+    max: 1000,
+    fallback: t.gameUpdates.defaultMessage,
+    placeholders: t.gameUpdates.placeholders,
+    hint: t.gameUpdates.hint,
+  },
 };
 
 /** The dashboard menu value for the XP roles page, which lives in its own table, not GuildConfig. */
@@ -112,9 +123,16 @@ const GROUPS: { name: keyof typeof t.setup.groups; keys: SettingKey[] }[] = [
       'boostCountName',
     ],
   },
+  {
+    name: 'updates',
+    keys: ['gameUpdatesOn', 'gameUpdateChannelId', 'gameUpdatePingRoleId', 'gameUpdateMessage'],
+  },
   // Listed last, so the XP roles menu entry appended after it sits next to it.
   { name: 'game', keys: ['rankUpChannelId'] },
 ];
+
+/** These groups get their own menu, because one menu holds at most 25 entries. */
+const GAME_GROUPS: readonly string[] = ['stats', 'updates', 'game'];
 
 export const isSettingKey = (key: string | undefined): key is SettingKey =>
   key !== undefined && Object.hasOwn(SETTINGS, key);
@@ -129,7 +147,7 @@ function formatValue(config: GuildConfig, key: SettingKey): string {
     return value.length ? value.map((id) => `<@&${id}>`).join(' ') : t.setup.notSet;
   }
   if (!value) return t.setup.notSet;
-  return SETTINGS[key].kind === 'role' ? `<@&${value}>` : `<#${value}>`;
+  return setting.kind === 'role' || setting.kind === 'pingRole' ? `<@&${value}>` : `<#${value}>`;
 }
 
 export function setupOverview(config: GuildConfig, notice?: string): BaseMessageOptions {
@@ -147,21 +165,32 @@ export function setupOverview(config: GuildConfig, notice?: string): BaseMessage
       })),
     );
 
-  const menu = new StringSelectMenuBuilder()
-    .setCustomId('setup:pick')
-    .setPlaceholder(t.setup.pickPlaceholder)
-    .addOptions([
-      ...GROUPS.flatMap((group) => group.keys).map((key) => ({
-        label: t.setup.settings[key].label,
-        description: t.setup.settings[key].description,
-        value: key,
-      })),
-      { label: t.xpRoles.label, description: t.xpRoles.description, value: XP_ROLES_PICK },
-    ]);
+  const menu = (customId: string, placeholder: string, game: boolean) =>
+    new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId(customId)
+        .setPlaceholder(placeholder)
+        .addOptions([
+          ...GROUPS.filter((group) => GAME_GROUPS.includes(group.name) === game)
+            .flatMap((group) => group.keys)
+            .map((key) => ({
+              label: t.setup.settings[key].label,
+              description: t.setup.settings[key].description,
+              value: key,
+            })),
+          ...(game
+            ? [{ label: t.xpRoles.label, description: t.xpRoles.description, value: XP_ROLES_PICK }]
+            : []),
+        ]),
+    );
 
   return {
     embeds: [embed],
-    components: [new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(menu)],
+    // Custom IDs must differ; setup:pick ignores the trailing tag.
+    components: [
+      menu('setup:pick', t.setup.pickPlaceholder, false),
+      menu('setup:pick:game', t.setup.pickGamePlaceholder, true),
+    ],
   };
 }
 
