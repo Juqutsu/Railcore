@@ -699,7 +699,8 @@ export const t = {
       },
       playerCountName: {
         label: 'Player count name',
-        description: 'Name of the player count channel.',
+        description:
+          'Name of the player count channel. Discord allows only 2 renames per 10 minutes.',
       },
     },
   },

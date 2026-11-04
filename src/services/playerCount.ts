@@ -7,9 +7,9 @@ import { isServedGuild } from './guildLock.js';
 import { playersOnline } from './roblox.js';
 
 const POLL_EVERY_MS = 10 * 60_000;
-/** Discord allows 2 renames per channel in 10 minutes; one per 5 minutes never runs into that. */
-const RENAME_GAP_MS = 5 * 60_000;
-const renamedAt = new Map<string, number>();
+/** Discord allows 2 renames per channel in 10 minutes; more would wait on its rate limit. */
+const RENAME_WINDOW_MS = 10 * 60_000;
+const renames = new Map<string, number[]>();
 /** The last count from Roblox, so a /setup change can apply it without asking Roblox again. */
 let lastCount: number | null = null;
 
@@ -55,10 +55,10 @@ async function rename(guild: Guild, count: number): Promise<void> {
   const name =
     fillChannelName(config.playerCountName ?? t.playerCount.defaultName, values) ||
     fillChannelName(t.playerCount.defaultName, values);
-  // Skipped renames are picked up by the next poll.
-  if (channel.name === name || Date.now() - (renamedAt.get(channel.id) ?? 0) < RENAME_GAP_MS) {
-    return;
-  }
-  renamedAt.set(channel.id, Date.now());
+  const now = Date.now();
+  const recent = (renames.get(channel.id) ?? []).filter((at) => now - at < RENAME_WINDOW_MS);
+  // A rename skipped for the limit is picked up by the next poll.
+  if (channel.name === name || recent.length >= 2) return;
+  renames.set(channel.id, [...recent, now]);
   await channel.setName(name, t.playerCount.auditRename);
 }
