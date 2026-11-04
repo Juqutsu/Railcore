@@ -1,6 +1,6 @@
 import { defineComponent } from '../../handlers.js';
 import { updateConfig, type ConfigPatch } from '../../services/guildConfig.js';
-import { PLAYER_COUNT_KEYS, refreshPlayerCount } from '../../services/playerCount.js';
+import { SERVER_STATS_KEYS, refreshServerStats } from '../../services/serverStats.js';
 import { isSettingKey, SETTINGS, setupOverview } from '../../services/setup.js';
 import { t } from '../../text.js';
 import { UserError } from '../../utils/errors.js';
@@ -42,7 +42,7 @@ export default defineComponent({
     }
 
     const config = await updateConfig(interaction.guildId, patch);
-    if (PLAYER_COUNT_KEYS.includes(key)) refreshPlayerCount(interaction.guild);
+    if (SERVER_STATS_KEYS.includes(key)) refreshServerStats(interaction.guild);
     await interaction.update(setupOverview(config, notice));
   },
 });

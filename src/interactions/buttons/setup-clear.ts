@@ -1,6 +1,6 @@
 import { defineComponent } from '../../handlers.js';
 import { updateConfig } from '../../services/guildConfig.js';
-import { PLAYER_COUNT_KEYS, refreshPlayerCount } from '../../services/playerCount.js';
+import { SERVER_STATS_KEYS, refreshServerStats } from '../../services/serverStats.js';
 import { isSettingKey, SETTINGS, setupOverview } from '../../services/setup.js';
 import { t } from '../../text.js';
 import { UserError } from '../../utils/errors.js';
@@ -14,7 +14,7 @@ export default defineComponent({
     }
     const { kind } = SETTINGS[key];
     const config = await updateConfig(interaction.guildId, { [key]: kind === 'roles' ? [] : null });
-    if (PLAYER_COUNT_KEYS.includes(key)) refreshPlayerCount(interaction.guild);
+    if (SERVER_STATS_KEYS.includes(key)) refreshServerStats(interaction.guild);
     const label = t.setup.settings[key].label;
     await interaction.update(
       setupOverview(config, kind === 'text' ? t.setup.usingDefault(label) : t.setup.cleared(label)),

@@ -566,12 +566,16 @@ export const t = {
       'There were no messages I could delete. Pinned messages, system messages and messages older than 14 days are skipped.',
   },
 
-  playerCount: {
-    defaultName: '🚆 {count} online',
+  serverStats: {
+    defaults: {
+      members: '👥 Members: {count}',
+      players: '🚆 {count} online',
+      boosts: '💎 Boosts: {count}',
+    },
     /** Shown as "Watching 141 drivers". */
     presence: (count: number) => `${count.toLocaleString('en-US')} driver${count === 1 ? '' : 's'}`,
-    auditRename: 'Player count update',
-    placeholders: '`{count}` players in the game right now',
+    auditRename: 'Server stats update',
+    placeholders: '`{count}` the current number',
     hint: 'Channel name. Placeholder: {count}. Empty = default name.',
   },
 
@@ -585,6 +589,7 @@ export const t = {
       welcome: 'Welcome & leave',
       tickets: 'Tickets & applications',
       logs: 'Logs',
+      stats: 'Server stats',
       game: 'Game',
     },
     xpRolesHint: 'pick *XP roles* in the menu below',
@@ -693,6 +698,15 @@ export const t = {
         label: 'Rank-up channel',
         description: 'Members reaching a new XP role are announced here.',
       },
+      memberCountChannelId: {
+        label: 'Member count channel',
+        description: 'Voice channel renamed to the member count every 10 minutes.',
+      },
+      memberCountName: {
+        label: 'Member count name',
+        description:
+          'Name of the member count channel. Discord allows only 2 renames per 10 minutes.',
+      },
       playerCountChannelId: {
         label: 'Player count channel',
         description: 'Voice channel renamed to the number of players in the game every 10 minutes.',
@@ -701,6 +715,15 @@ export const t = {
         label: 'Player count name',
         description:
           'Name of the player count channel. Discord allows only 2 renames per 10 minutes.',
+      },
+      boostCountChannelId: {
+        label: 'Boost count channel',
+        description: 'Voice channel renamed to the number of server boosts every 10 minutes.',
+      },
+      boostCountName: {
+        label: 'Boost count name',
+        description:
+          'Name of the boost count channel. Discord allows only 2 renames per 10 minutes.',
       },
     },
   },

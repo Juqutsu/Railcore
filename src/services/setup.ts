@@ -39,6 +39,16 @@ type Setting =
   | NumberSetting
   | TextSetting;
 
+/** Renaming a stat channel needs Manage Channels on the channel itself. */
+const RENAME: PermissionsString[] = ['ViewChannel', 'ManageChannels'];
+const statName = (fallback: string): TextSetting => ({
+  kind: 'text',
+  max: 90,
+  fallback,
+  placeholders: t.serverStats.placeholders,
+  hint: t.serverStats.hint,
+});
+
 export const SETTINGS: Record<SettingKey, Setting> = {
   verificationChannelId: { kind: 'channel', permissions: POST },
   verifiedRoleId: { kind: 'role' },
@@ -61,15 +71,12 @@ export const SETTINGS: Record<SettingKey, Setting> = {
   modLogChannelId: { kind: 'channel', permissions: POST },
   serverLogChannelId: { kind: 'channel', permissions: POST },
   rankUpChannelId: { kind: 'channel', permissions: POST },
-  // Renaming needs Manage Channels on the channel itself.
-  playerCountChannelId: { kind: 'voice', permissions: ['ViewChannel', 'ManageChannels'] },
-  playerCountName: {
-    kind: 'text',
-    max: 90,
-    fallback: t.playerCount.defaultName,
-    placeholders: t.playerCount.placeholders,
-    hint: t.playerCount.hint,
-  },
+  memberCountChannelId: { kind: 'voice', permissions: RENAME },
+  memberCountName: statName(t.serverStats.defaults.members),
+  playerCountChannelId: { kind: 'voice', permissions: RENAME },
+  playerCountName: statName(t.serverStats.defaults.players),
+  boostCountChannelId: { kind: 'voice', permissions: RENAME },
+  boostCountName: statName(t.serverStats.defaults.boosts),
 };
 
 /** The dashboard menu value for the XP roles page, which lives in its own table, not GuildConfig. */
@@ -94,8 +101,19 @@ const GROUPS: { name: keyof typeof t.setup.groups; keys: SettingKey[] }[] = [
     ],
   },
   { name: 'logs', keys: ['modLogChannelId', 'serverLogChannelId'] },
+  {
+    name: 'stats',
+    keys: [
+      'memberCountChannelId',
+      'memberCountName',
+      'playerCountChannelId',
+      'playerCountName',
+      'boostCountChannelId',
+      'boostCountName',
+    ],
+  },
   // Listed last, so the XP roles menu entry appended after it sits next to it.
-  { name: 'game', keys: ['rankUpChannelId', 'playerCountChannelId', 'playerCountName'] },
+  { name: 'game', keys: ['rankUpChannelId'] },
 ];
 
 export const isSettingKey = (key: string | undefined): key is SettingKey =>

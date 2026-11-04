@@ -1,6 +1,6 @@
 import { defineComponent } from '../../handlers.js';
 import { updateConfig } from '../../services/guildConfig.js';
-import { PLAYER_COUNT_KEYS, refreshPlayerCount } from '../../services/playerCount.js';
+import { SERVER_STATS_KEYS, refreshServerStats } from '../../services/serverStats.js';
 import { isSettingKey, SETTINGS, setupOverview } from '../../services/setup.js';
 import { t } from '../../text.js';
 import { UserError } from '../../utils/errors.js';
@@ -18,7 +18,7 @@ export default defineComponent({
     // Empty or the unchanged default stores null, so later wording changes in text.ts still apply.
     const value = text && text !== setting.fallback ? text : null;
     const config = await updateConfig(interaction.guildId, { [key]: value });
-    if (PLAYER_COUNT_KEYS.includes(key)) refreshPlayerCount(interaction.guild);
+    if (SERVER_STATS_KEYS.includes(key)) refreshServerStats(interaction.guild);
     const label = t.setup.settings[key].label;
     await interaction.update(
       setupOverview(config, value ? t.setup.saved(label) : t.setup.usingDefault(label)),

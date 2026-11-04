@@ -45,6 +45,12 @@ model GuildConfig {
   playerCountChannelId  String?
   /// Custom channel name with {count}; null = default name.
   playerCountName       String?
+  /// Voice channel renamed to the member count; null = off.
+  memberCountChannelId  String?
+  memberCountName       String?
+  /// Voice channel renamed to the number of server boosts; null = off.
+  boostCountChannelId   String?
+  boostCountName        String?
   updatedAt             DateTime @updatedAt
 }
 

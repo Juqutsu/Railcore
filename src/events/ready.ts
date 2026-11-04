@@ -1,7 +1,7 @@
 import { ActivityType, Events } from 'discord.js';
 import { defineEvent } from '../handlers.js';
 import { leaveForeignGuilds, servedScope } from '../services/guildLock.js';
-import { startPlayerCount } from '../services/playerCount.js';
+import { startServerStats } from '../services/serverStats.js';
 import { startTicketReminders } from '../services/ticketReminders.js';
 import { startXpRoleSync } from '../services/xpRoleSync.js';
 import { t } from '../text.js';
@@ -14,7 +14,7 @@ export default defineEvent({
     client.user.setActivity(t.presence, { type: ActivityType.Watching });
     startTicketReminders(client);
     startXpRoleSync(client);
-    startPlayerCount(client);
+    startServerStats(client);
     void leaveForeignGuilds(client);
     logger.info({ serving: servedScope() }, 'Handling events for this server only');
     logger.info({ user: client.user.tag, guilds: client.guilds.cache.size }, 'Railcore is online');
