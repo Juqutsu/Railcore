@@ -22,10 +22,19 @@ import { POST_PERMISSIONS as POST } from '../utils/permissions.js';
 export type SettingKey = keyof typeof t.setup.settings;
 
 type NumberSetting = { kind: 'number'; unit: keyof typeof t.setup.units; max: number };
-/** Stored as null while the default text (`fallback`) is used. */
-type TextSetting = { kind: 'text'; max: number; fallback: string };
+/**
+ * Stored as null while the default text (`fallback`) is used. `placeholders` and `hint` default to
+ * the welcome texts' ones.
+ */
+type TextSetting = {
+  kind: 'text';
+  max: number;
+  fallback: string;
+  placeholders?: string;
+  hint?: string;
+};
 type Setting =
-  | { kind: 'channel' | 'category'; permissions: PermissionsString[] }
+  | { kind: 'channel' | 'category' | 'voice'; permissions: PermissionsString[] }
   | { kind: 'role' | 'roles' | 'toggle' }
   | NumberSetting
   | TextSetting;
@@ -52,6 +61,15 @@ export const SETTINGS: Record<SettingKey, Setting> = {
   modLogChannelId: { kind: 'channel', permissions: POST },
   serverLogChannelId: { kind: 'channel', permissions: POST },
   rankUpChannelId: { kind: 'channel', permissions: POST },
+  // Renaming needs Manage Channels on the channel itself.
+  playerCountChannelId: { kind: 'voice', permissions: ['ViewChannel', 'ManageChannels'] },
+  playerCountName: {
+    kind: 'text',
+    max: 90,
+    fallback: t.playerCount.defaultName,
+    placeholders: t.playerCount.placeholders,
+    hint: t.playerCount.hint,
+  },
 };
 
 /** The dashboard menu value for the XP roles page, which lives in its own table, not GuildConfig. */
@@ -77,7 +95,7 @@ const GROUPS: { name: keyof typeof t.setup.groups; keys: SettingKey[] }[] = [
   },
   { name: 'logs', keys: ['modLogChannelId', 'serverLogChannelId'] },
   // Listed last, so the XP roles menu entry appended after it sits next to it.
-  { name: 'game', keys: ['rankUpChannelId'] },
+  { name: 'game', keys: ['rankUpChannelId', 'playerCountChannelId', 'playerCountName'] },
 ];
 
 export const isSettingKey = (key: string | undefined): key is SettingKey =>
@@ -139,7 +157,7 @@ export function setupEditor(
   const value = config[key];
   const body =
     setting.kind === 'text'
-      ? `${description}\n${t.setup.placeholders}\n\n**${t.setup.current}:** ${formatValue(config, key)}\n>>> ${typeof value === 'string' ? value : setting.fallback}`
+      ? `${description}\n${setting.placeholders ?? t.setup.placeholders}\n\n**${t.setup.current}:** ${formatValue(config, key)}\n>>> ${typeof value === 'string' ? value : setting.fallback}`
       : `${description}\n\n**${t.setup.current}:** ${formatValue(config, key)}`;
   const embed = embeds.info(t.setup.editTitle(label), body);
   const back = new ButtonBuilder()
@@ -184,12 +202,18 @@ export function setupEditor(
   const customId = `setup:value:${key}`;
   let menu: ChannelSelectMenuBuilder | RoleSelectMenuBuilder;
 
-  if (setting.kind === 'channel' || setting.kind === 'category') {
-    const isCategory = setting.kind === 'category';
+  if (setting.kind === 'channel' || setting.kind === 'category' || setting.kind === 'voice') {
+    const [type, placeholder] = (
+      {
+        channel: [ChannelType.GuildText, t.setup.channelPlaceholder],
+        category: [ChannelType.GuildCategory, t.setup.categoryPlaceholder],
+        voice: [ChannelType.GuildVoice, t.setup.voicePlaceholder],
+      } as const
+    )[setting.kind];
     menu = new ChannelSelectMenuBuilder()
       .setCustomId(customId)
-      .setChannelTypes(isCategory ? ChannelType.GuildCategory : ChannelType.GuildText)
-      .setPlaceholder(isCategory ? t.setup.categoryPlaceholder : t.setup.channelPlaceholder);
+      .setChannelTypes(type)
+      .setPlaceholder(placeholder);
     // Discord rejects default values that no longer exist, e.g. a deleted channel.
     const existing = current.filter((id) => guild.channels.cache.has(id));
     if (existing.length) menu.setDefaultChannels(existing);
@@ -251,7 +275,7 @@ export function textModal(
     .addLabelComponents(
       new LabelBuilder()
         .setLabel(t.setup.messageLabel)
-        .setDescription(t.setup.textHint)
+        .setDescription(setting.hint ?? t.setup.textHint)
         .setTextInputComponent(
           new TextInputBuilder()
             .setCustomId('value')

@@ -566,6 +566,15 @@ export const t = {
       'There were no messages I could delete. Pinned messages, system messages and messages older than 14 days are skipped.',
   },
 
+  playerCount: {
+    defaultName: '🚆 {count} online',
+    /** Shown as "Watching 141 drivers". */
+    presence: (count: number) => `${count.toLocaleString('en-US')} driver${count === 1 ? '' : 's'}`,
+    auditRename: 'Player count update',
+    placeholders: '`{count}` players in the game right now',
+    hint: 'Channel name. Placeholder: {count}. Empty = default name.',
+  },
+
   setup: {
     title: 'Railcore setup',
     intro: 'Pick a setting below to change it. Changes save instantly.',
@@ -584,6 +593,7 @@ export const t = {
     current: 'Current',
     channelPlaceholder: 'Select a channel…',
     categoryPlaceholder: 'Select a category…',
+    voicePlaceholder: 'Select a voice channel…',
     rolePlaceholder: 'Select a role…',
     rolesPlaceholder: 'Select up to 10 roles…',
     back: 'Back',
@@ -682,6 +692,14 @@ export const t = {
       rankUpChannelId: {
         label: 'Rank-up channel',
         description: 'Members reaching a new XP role are announced here.',
+      },
+      playerCountChannelId: {
+        label: 'Player count channel',
+        description: 'Voice channel renamed to the number of players in the game every 10 minutes.',
+      },
+      playerCountName: {
+        label: 'Player count name',
+        description: 'Name of the player count channel.',
       },
     },
   },

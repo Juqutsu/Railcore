@@ -41,6 +41,10 @@ model GuildConfig {
   rankUpChannelId       String?
   /// Start of the last full Bloxlink pass for XP roles; it runs daily to find new links.
   xpRolesSyncedAt       DateTime?
+  /// Voice channel renamed to the number of players in the game; null = off.
+  playerCountChannelId  String?
+  /// Custom channel name with {count}; null = default name.
+  playerCountName       String?
   updatedAt             DateTime @updatedAt
 }
 

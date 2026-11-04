@@ -140,6 +140,13 @@ const userByName = cached(10 * 60_000, async (username) => {
   return { robloxId: String(user.id), name: user.name, displayName };
 });
 
+/** How many people are in the game right now, from the public games API (no key needed). */
+export async function playersOnline(): Promise<number | null> {
+  const body = await getJson(`https://games.roblox.com/v1/games?universeIds=${UNIVERSE_ID}`);
+  const game: unknown = isRecord(body) && Array.isArray(body.data) ? body.data[0] : null;
+  return isRecord(game) && typeof game.playing === 'number' ? game.playing : null;
+}
+
 /** Display names for many players in one request. Missing ones are left out. */
 async function displayNames(robloxIds: string[]): Promise<Map<string, string>> {
   const body = await getJson('https://users.roblox.com/v1/users', {
