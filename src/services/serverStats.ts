@@ -67,6 +67,8 @@ async function poll(client: Client<true>): Promise<void> {
     return null;
   });
   if (game) {
+    // Also shows that the 10-minute poll is alive.
+    if (game.playing !== lastPlayers) logger.info({ players: game.playing }, 'Players in game');
     lastPlayers = game.playing;
     client.user.setActivity(game.playing ? t.serverStats.presence(game.playing) : t.presence, {
       type: ActivityType.Watching,
@@ -106,6 +108,7 @@ async function renameAll(guild: Guild): Promise<void> {
     // A rename skipped for the limit is picked up by the next poll.
     if (channel.name === name || recent.length >= 2) continue;
     renames.set(channel.id, [...recent, now]);
+    logger.info({ channelId: channel.id, name }, 'Renaming stat channel');
     // One broken channel (e.g. missing permission) must not stop the others.
     await channel
       .setName(name, t.serverStats.auditRename)

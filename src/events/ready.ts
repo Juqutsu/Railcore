@@ -1,4 +1,4 @@
-import { ActivityType, Events } from 'discord.js';
+import { ActivityType, Events, RESTEvents } from 'discord.js';
 import { defineEvent } from '../handlers.js';
 import { leaveForeignGuilds, servedScope } from '../services/guildLock.js';
 import { startServerStats } from '../services/serverStats.js';
@@ -12,6 +12,13 @@ export default defineEvent({
   once: true,
   execute(client) {
     client.user.setActivity(t.presence, { type: ActivityType.Watching });
+    // discord.js waits out rate limits silently; this makes them visible, e.g. on channel renames.
+    client.rest.on(RESTEvents.RateLimited, (info) =>
+      logger.warn(
+        { route: info.route, method: info.method, retryAfterMs: info.retryAfter },
+        'Discord rate limit',
+      ),
+    );
     startTicketReminders(client);
     startXpRoleSync(client);
     startServerStats(client);

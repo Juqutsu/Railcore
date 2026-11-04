@@ -153,6 +153,7 @@ export async function gameInfo(): Promise<GameInfo | null> {
     typeof game.updated !== 'string' ||
     typeof game.rootPlaceId !== 'number'
   ) {
+    logger.warn({ body: JSON.stringify(body).slice(0, 300) }, 'Unexpected games API answer');
     return null;
   }
   const updated = new Date(game.updated);
