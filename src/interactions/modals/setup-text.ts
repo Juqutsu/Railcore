@@ -1,7 +1,7 @@
 import { defineComponent } from '../../handlers.js';
 import { updateConfig } from '../../services/guildConfig.js';
 import { SERVER_STATS_KEYS, refreshServerStats } from '../../services/serverStats.js';
-import { isSettingKey, SETTINGS, setupOverview } from '../../services/setup.js';
+import { isSettingKey, SETTINGS, setupOverview, textProblem } from '../../services/setup.js';
 import { t } from '../../text.js';
 import { UserError } from '../../utils/errors.js';
 
@@ -15,6 +15,8 @@ export default defineComponent({
     const setting = SETTINGS[key];
     if (setting.kind !== 'text') throw new UserError(t.errors.unknownInteraction);
     const text = interaction.fields.getTextInputValue('value').trim();
+    const problem = textProblem(key, text);
+    if (problem) throw new UserError(problem);
     // Empty or the unchanged default stores null, so later wording changes in text.ts still apply.
     const value = text && text !== setting.fallback ? text : null;
     const config = await updateConfig(interaction.guildId, { [key]: value });

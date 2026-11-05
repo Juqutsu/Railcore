@@ -157,7 +157,10 @@ export async function gameInfo(): Promise<GameInfo | null> {
     return null;
   }
   const updated = new Date(game.updated);
-  if (Number.isNaN(updated.getTime())) return null;
+  if (Number.isNaN(updated.getTime())) {
+    logger.warn({ updated: game.updated }, 'Unexpected games API answer');
+    return null;
+  }
   const url = `https://www.roblox.com/games/${game.rootPlaceId}`;
   return { name: game.name, playing: game.playing, updated, url };
 }

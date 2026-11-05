@@ -24,7 +24,7 @@ export type SettingKey = keyof typeof t.setup.settings;
 type NumberSetting = { kind: 'number'; unit: keyof typeof t.setup.units; max: number };
 /**
  * Stored as null while the default text (`fallback`) is used. `placeholders` and `hint` default to
- * the welcome texts' ones.
+ * the welcome texts' ones. A custom text must contain `requires`, if set.
  */
 type TextSetting = {
   kind: 'text';
@@ -32,6 +32,7 @@ type TextSetting = {
   fallback: string;
   placeholders?: string;
   hint?: string;
+  requires?: string;
 };
 type Setting =
   | { kind: 'channel' | 'category' | 'voice'; permissions: PermissionsString[] }
@@ -48,6 +49,8 @@ const statName = (fallback: string): TextSetting => ({
   fallback,
   placeholders: t.serverStats.placeholders,
   hint: t.serverStats.hint,
+  // Without it the name is the same on every update, so the channel would never change.
+  requires: '{count}',
 });
 
 export const SETTINGS: Record<SettingKey, Setting> = {
@@ -133,6 +136,15 @@ const GROUPS: { name: keyof typeof t.setup.groups; keys: SettingKey[] }[] = [
 
 /** These groups get their own menu, because one menu holds at most 25 entries. */
 const GAME_GROUPS: readonly string[] = ['stats', 'updates', 'game'];
+
+/** Why `text` can't be saved for this setting, or null. Empty text means "use the default". */
+export function textProblem(key: SettingKey, text: string): string | null {
+  const setting = SETTINGS[key];
+  if (setting.kind !== 'text' || !setting.requires || !text || text.includes(setting.requires)) {
+    return null;
+  }
+  return t.setup.missingPlaceholder(t.setup.settings[key].label, setting.requires);
+}
 
 export const isSettingKey = (key: string | undefined): key is SettingKey =>
   key !== undefined && Object.hasOwn(SETTINGS, key);

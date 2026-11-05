@@ -578,7 +578,7 @@ export const t = {
     presence: (count: number) => `${count.toLocaleString('en-US')} driver${count === 1 ? '' : 's'}`,
     auditRename: 'Server stats update',
     placeholders: '`{count}` the current number',
-    hint: 'Channel name. Placeholder: {count}. Empty = default name.',
+    hint: 'Channel name. Must contain {count}, which becomes the number. Empty = default name.',
   },
 
   reports: {
@@ -633,6 +633,8 @@ export const t = {
     cleared: (label: string) => `✅ Cleared **${label}**.`,
     savedMissingPerms: (label: string, channel: string, perms: string) =>
       `⚠️ Saved **${label}**, but I'm missing **${perms}** in ${channel}. Fix that, or I can't work there.`,
+    missingPlaceholder: (label: string, placeholder: string) =>
+      `**${label}** must contain \`${placeholder}\`, which becomes the number. Without it the name never changes.`,
     savedNoPing: (label: string, role: string) =>
       `⚠️ Saved **${label}**, but I can't ping ${role}. Make the role mentionable, or give me **Mention @everyone, @here and All Roles**.`,
     hours: (n: number) => (n === 0 ? 'Off' : `${n} hour${n === 1 ? '' : 's'}`),
