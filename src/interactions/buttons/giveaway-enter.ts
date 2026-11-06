@@ -1,7 +1,8 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } from 'discord.js';
 import { prisma } from '../../database/client.js';
 import { defineComponent } from '../../handlers.js';
-import { scheduleCountRefresh } from '../../services/giveaways.js';
+import { checkEligible, scheduleCountRefresh } from '../../services/giveaways.js';
+import { getConfig } from '../../services/guildConfig.js';
 import { t } from '../../text.js';
 
 export default defineComponent({
@@ -14,6 +15,19 @@ export default defineComponent({
       : null;
     if (!giveaway || giveaway.endedAt) {
       await interaction.reply({ content: t.giveaways.ended, flags: MessageFlags.Ephemeral });
+      return;
+    }
+    if (!interaction.inCachedGuild()) return;
+    const reason = await checkEligible(
+      interaction.member,
+      await getConfig(interaction.guildId),
+      new Date(),
+    );
+    if (reason) {
+      await interaction.reply({
+        content: t.giveaways.cantEnter(reason),
+        flags: MessageFlags.Ephemeral,
+      });
       return;
     }
     const { count } = await prisma.giveawayEntry.createMany({

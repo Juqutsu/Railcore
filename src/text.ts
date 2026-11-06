@@ -42,6 +42,9 @@ export const t = {
     giveaway: 'Host and manage giveaways',
     giveawayStart: 'Start a giveaway',
     giveawayEnd: 'End a giveaway now and draw the winners',
+    giveawayBlock: 'Block a member from giveaways',
+    giveawayUnblock: 'Let a blocked member enter giveaways again',
+    giveawayBlocklist: 'Show who is blocked from giveaways',
   },
 
   /** Right-click menu entries (Apps). Max 32 characters; re-register commands after changing. */
@@ -71,6 +74,8 @@ export const t = {
     giveawayWinners: 'How many winners (default: 1)',
     giveawayChannel: 'Where to post it (default: the giveaway channel from /setup)',
     giveawayPick: 'Which giveaway',
+    giveawayBlockUser: 'The member',
+    giveawayBlockReason: 'Why (shown in the blocklist)',
   },
 
   giveaways: {
@@ -102,6 +107,18 @@ export const t = {
     notFound: "That giveaway doesn't exist.",
     alreadyEnded: 'That giveaway already ended.',
     endedNow: 'Ended.',
+    cantEnter: (reason: string) => `❌ **You can't enter this giveaway.**\n${reason}`,
+    reasonRole: "You have a role that can't enter giveaways.",
+    reasonBlocked: 'You are blocked from giveaways.',
+    reasonWarned: 'You have an active warning.',
+    reasonWon: (days: number) => `You won a giveaway in the last ${days} days.`,
+    blocked: (user: string) => `${user} is now blocked from giveaways.`,
+    unblocked: (user: string) => `${user} can enter giveaways again.`,
+    notBlocked: "That user isn't blocked.",
+    blocklistTitle: 'Giveaway blocklist',
+    blocklistEmpty: 'Nobody is blocked from giveaways.',
+    blocklistLine: (userId: string, byId: string, reason: string | null, date: string) =>
+      `<@${userId}> · by <@${byId}> · ${reason ?? 'no reason'} · ${date}`,
     choiceEnds: 'ends',
     choiceEnded: 'ended',
     winnerPing: (winnerIds: string[], prize: string, hostId: string) =>

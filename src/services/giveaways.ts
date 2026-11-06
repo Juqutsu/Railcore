@@ -16,11 +16,17 @@ import { logger } from '../utils/logger.js';
 import { missingPermissions, POST_PERMISSIONS } from '../utils/permissions.js';
 import { sendDm } from './dm.js';
 import { giveawayMessage, type GiveawayView } from './giveawayMessage.js';
-import { canManage, choiceName, isHost } from './giveawayRules.js';
+import {
+  canManage,
+  choiceName,
+  ineligibleReason,
+  isHost,
+  type EligibilityFacts,
+} from './giveawayRules.js';
 import { getConfig } from './guildConfig.js';
 import { isServedGuild } from './guildLock.js';
 
-export { canManage, giveawayMessage, isHost, type GiveawayView };
+export { canManage, giveawayMessage, isHost, type EligibilityFacts, type GiveawayView };
 
 export function requireHost(member: GuildMember, config: GuildConfig): void {
   if (!isHost(member, config)) throw new UserError(t.giveaways.cantHost);
@@ -37,6 +43,59 @@ export async function getManagedGiveaway(member: GuildMember, id: number): Promi
   if (g?.guildId !== member.guild.id) throw new UserError(t.giveaways.notFound);
   requireManage(member, await getConfig(member.guild.id), g);
   return g;
+}
+
+const DAY_MS = 86_400_000;
+
+export async function eligibilityFacts(
+  member: GuildMember,
+  config: GuildConfig,
+  now: Date,
+): Promise<EligibilityFacts> {
+  const guildId = member.guild.id;
+  const since = (days: number) => new Date(now.getTime() - days * DAY_MS);
+  const [block, warning, win] = await Promise.all([
+    prisma.giveawayBlock.findUnique({ where: { guildId_userId: { guildId, userId: member.id } } }),
+    config.giveawayBlockWarned
+      ? prisma.modCase.findFirst({
+          where: {
+            guildId,
+            targetId: member.id,
+            action: 'WARN',
+            clearedAt: null,
+            createdAt: config.giveawayWarnDays
+              ? { gte: since(config.giveawayWarnDays) }
+              : undefined,
+          },
+          select: { id: true },
+        })
+      : null,
+    config.giveawayWinnerCooldownDays > 0
+      ? prisma.giveawayWinner.findFirst({
+          where: {
+            userId: member.id,
+            wonAt: { gte: since(config.giveawayWinnerCooldownDays) },
+            giveaway: { guildId },
+          },
+          select: { userId: true },
+        })
+      : null,
+  ]);
+  return {
+    roleIds: [...member.roles.cache.keys()],
+    blocked: block !== null,
+    hasActiveWarning: warning !== null,
+    wonRecently: win !== null,
+  };
+}
+
+/** Why the member can't enter right now, or null. Used on Enter and in the draw. */
+export async function checkEligible(
+  member: GuildMember,
+  config: GuildConfig,
+  now: Date,
+): Promise<string | null> {
+  return ineligibleReason(await eligibilityFacts(member, config, now), config);
 }
 
 const REFRESH_INTERVAL_MS = 10_000;
@@ -106,13 +165,14 @@ export async function endGiveaway(
   // the commit, so the next tick redraws instead of committing a wrong draw.
   const guild = client.guilds.cache.get(g.guildId);
   if (!guild?.available) throw new Error(`Guild ${g.guildId} is not available`);
+  const config = await getConfig(g.guildId);
   const winners = await pickWinners(
     g.entries.map((e) => e.userId),
     g.winnerCount,
     async (id) => {
       try {
-        await guild.members.fetch(id);
-        return true;
+        const member = await guild.members.fetch(id);
+        return (await checkEligible(member, config, new Date())) === null;
       } catch (err) {
         if (err instanceof DiscordAPIError && notAMember.has(err.code)) return false;
         throw err;

@@ -23,6 +23,26 @@ export function canManage(
   );
 }
 
+export type EligibilityFacts = {
+  roleIds: readonly string[];
+  blocked: boolean;
+  hasActiveWarning: boolean;
+  wonRecently: boolean;
+};
+
+/** Why the member can't enter, or null. First failure wins. */
+export function ineligibleReason(facts: EligibilityFacts, config: GuildConfig): string | null {
+  if (config.giveawayBlockedRoleIds.some((id) => facts.roleIds.includes(id))) {
+    return t.giveaways.reasonRole;
+  }
+  if (facts.blocked) return t.giveaways.reasonBlocked;
+  if (config.giveawayBlockWarned && facts.hasActiveWarning) return t.giveaways.reasonWarned;
+  if (config.giveawayWinnerCooldownDays > 0 && facts.wonRecently) {
+    return t.giveaways.reasonWon(config.giveawayWinnerCooldownDays);
+  }
+  return null;
+}
+
 const MAX_CHOICE_NAME = 100;
 const formatDate = (d: Date) => `${d.toISOString().slice(0, 16).replace('T', ' ')} UTC`;
 

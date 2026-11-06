@@ -3,9 +3,16 @@ import { test } from 'node:test';
 import type { GuildMember } from 'discord.js';
 import type { Giveaway, GuildConfig } from '../generated/prisma/client.js';
 import { giveawayMessage, type GiveawayView } from './giveawayMessage.js';
-import { canManage, choiceName } from './giveawayRules.js';
+import { canManage, choiceName, ineligibleReason } from './giveawayRules.js';
 
-const cfg = (overrides: Partial<GuildConfig>) => overrides as GuildConfig;
+const cfg = (overrides: Partial<GuildConfig>) =>
+  ({
+    giveawayBlockedRoleIds: [],
+    giveawayBlockWarned: false,
+    giveawayWarnDays: 0,
+    giveawayWinnerCooldownDays: 0,
+    ...overrides,
+  }) as GuildConfig;
 const member = (id: string, roleIds: string[], opts: { manageGuild?: boolean } = {}) =>
   ({
     id,
@@ -84,4 +91,30 @@ void test('cancelled giveaway shows "Cancelled"', () => {
   const button = msg.components[0].toJSON().components[0] as ButtonJson;
   assert.equal(button.label, '🎉 Cancelled');
   assert.match(embedOf(msg).title!, /· Cancelled$/);
+});
+
+const base = { roleIds: [], blocked: false, hasActiveWarning: false, wonRecently: false };
+void test('blocked role wins over everything else', () => {
+  const c = cfg({ giveawayBlockedRoleIds: ['r'], giveawayBlockWarned: true });
+  assert.match(ineligibleReason({ ...base, roleIds: ['r'], blocked: true }, c)!, /role/);
+});
+void test('manual block', () => {
+  assert.match(ineligibleReason({ ...base, blocked: true }, cfg({}))!, /blocked/);
+});
+void test('warnings only count when the setting is on', () => {
+  assert.equal(ineligibleReason({ ...base, hasActiveWarning: true }, cfg({})), null);
+  assert.match(
+    ineligibleReason({ ...base, hasActiveWarning: true }, cfg({ giveawayBlockWarned: true }))!,
+    /active warning/,
+  );
+});
+void test('winner cooldown names the days and is off at 0', () => {
+  assert.equal(ineligibleReason({ ...base, wonRecently: true }, cfg({})), null);
+  assert.match(
+    ineligibleReason({ ...base, wonRecently: true }, cfg({ giveawayWinnerCooldownDays: 30 }))!,
+    /last 30 days/,
+  );
+});
+void test('eligible member gets null', () => {
+  assert.equal(ineligibleReason(base, cfg({ giveawayBlockWarned: true })), null);
 });
