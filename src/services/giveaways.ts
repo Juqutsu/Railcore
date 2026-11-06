@@ -4,6 +4,7 @@ import {
   RESTJSONErrorCodes,
   type ApplicationCommandOptionChoiceData,
   type Client,
+  type Guild,
   type GuildMember,
   type GuildTextBasedChannel,
 } from 'discord.js';
@@ -147,6 +148,148 @@ const notAMember = new Set<unknown>([
 ]);
 
 /**
+ * Only "not a member" disqualifies. Any other failure (outage) throws before the commit, so the
+ * next tick redraws instead of committing a wrong draw.
+ */
+function isValidEntrant(guild: Guild, config: GuildConfig): (id: string) => Promise<boolean> {
+  return async (id) => {
+    try {
+      const member = await guild.members.fetch(id);
+      return (await checkEligible(member, config, new Date())) === null;
+    } catch (err) {
+      if (err instanceof DiscordAPIError && notAMember.has(err.code)) return false;
+      throw err;
+    }
+  };
+}
+
+async function drawContext(
+  client: Client,
+  guildId: string,
+): Promise<{ guild: Guild; config: GuildConfig }> {
+  const guild = client.guilds.cache.get(guildId);
+  if (!guild?.available) throw new Error(`Guild ${guildId} is not available`);
+  return { guild, config: await getConfig(guildId) };
+}
+
+const goneCodes = new Set<unknown>([
+  RESTJSONErrorCodes.UnknownChannel,
+  RESTJSONErrorCodes.UnknownMessage,
+]);
+
+/** True when Discord says the giveaway's channel or post no longer exists. */
+async function isGone(client: Client, g: Giveaway): Promise<boolean> {
+  if (!g.messageId) return false;
+  try {
+    const channel = await client.channels.fetch(g.channelId);
+    if (!channel?.isTextBased()) return true;
+    await channel.messages.fetch(g.messageId);
+    return false;
+  } catch (err) {
+    if (err instanceof DiscordAPIError && goneCodes.has(err.code)) return true;
+    throw err;
+  }
+}
+
+/**
+ * Cancels a running giveaway (command, or its post was deleted). A cheap no-op for any other id.
+ * Same conditional write as the draw, so a giveaway can't end both ways.
+ */
+export async function cancelGiveaway(
+  client: Client,
+  where: { id: number } | { messageId: string },
+): Promise<boolean> {
+  const now = new Date();
+  const { count } = await prisma.giveaway.updateMany({
+    where: { ...where, endedAt: null },
+    data: { endedAt: now, cancelledAt: now },
+  });
+  if (count === 0) return false;
+  const g = await prisma.giveaway.findFirstOrThrow({
+    where,
+    include: { _count: { select: { entries: true } } },
+  });
+  forgetRefresh(g.id);
+  try {
+    const channel = await client.channels.fetch(g.channelId);
+    if (channel?.isTextBased() && g.messageId) {
+      await channel.messages.edit(
+        g.messageId,
+        giveawayMessage({ ...g, winnerIds: [] }, g._count.entries),
+      );
+    }
+  } catch (err) {
+    if (!(err instanceof DiscordAPIError && goneCodes.has(err.code))) {
+      logger.warn({ err, giveawayId: g.id }, 'Could not edit the cancelled giveaway');
+    }
+  }
+  return true;
+}
+
+/** Draws `count` more winners from the entries who haven't won yet. Returns the new winners. */
+export async function rerollGiveaway(
+  client: Client,
+  giveawayId: number,
+  count: number,
+): Promise<string[]> {
+  const g = await prisma.giveaway.findUnique({
+    where: { id: giveawayId },
+    include: { entries: { select: { userId: true } }, winners: { select: { userId: true } } },
+  });
+  if (!g) throw new UserError(t.giveaways.notFound);
+  if (!g.endedAt) throw new UserError(t.giveaways.notEnded);
+  if (g.cancelledAt) throw new UserError(t.giveaways.wasCancelled);
+  const { guild, config } = await drawContext(client, g.guildId);
+  const won = new Set(g.winners.map((w) => w.userId));
+  const picked = await pickWinners(
+    g.entries.map((e) => e.userId).filter((id) => !won.has(id)),
+    count,
+    isValidEntrant(guild, config),
+  );
+  if (!picked.length) return [];
+  // skipDuplicates: two rerolls at once can't create a winner row twice.
+  await prisma.giveawayWinner.createMany({
+    data: picked.map((userId) => ({ giveawayId, userId, wonAt: new Date() })),
+    skipDuplicates: true,
+  });
+  const all = await prisma.giveaway.findUniqueOrThrow({
+    where: { id: giveawayId },
+    include: {
+      winners: { select: { userId: true }, orderBy: { wonAt: 'asc' } },
+      _count: { select: { entries: true } },
+    },
+  });
+  const log = { giveawayId, guildId: g.guildId };
+  const channel = await client.channels.fetch(g.channelId).catch((err: unknown) => {
+    logger.warn({ err, ...log }, 'Giveaway channel is gone');
+    return null;
+  });
+  if (channel?.isSendable() && g.messageId) {
+    try {
+      await channel.messages.edit(
+        g.messageId,
+        giveawayMessage(
+          { ...all, winnerIds: all.winners.map((w) => w.userId) },
+          all._count.entries,
+        ),
+      );
+    } catch (err) {
+      logger.warn({ err, ...log }, 'Could not edit the rerolled giveaway');
+    }
+    try {
+      await channel.send({
+        content: t.giveaways.winnerPing(picked, g.prize, g.hostId),
+        reply: { messageReference: g.messageId, failIfNotExists: false },
+        allowedMentions: { users: [...picked, g.hostId] },
+      });
+    } catch (err) {
+      logger.warn({ err, ...log }, 'Could not ping the rerolled winners');
+    }
+  }
+  return picked;
+}
+
+/**
  * Draws, then commits the winners. The conditional write is what stops a second draw: a losing
  * racer (job vs /giveaway end) discards its draw. A crash before it just redraws next tick.
  */
@@ -159,25 +302,16 @@ export async function endGiveaway(
     include: { entries: { select: { userId: true } } },
   });
   if (!g || g.endedAt) return 'already';
-  // TODO(Task 5): cancel instead of drawing when the post or channel is gone. Until then the
-  // draw is committed and announce() logs the failed edit and ping, and still DMs the host.
-  // Only "not a member" disqualifies. Any other failure (outage, guild unavailable) throws before
-  // the commit, so the next tick redraws instead of committing a wrong draw.
-  const guild = client.guilds.cache.get(g.guildId);
-  if (!guild?.available) throw new Error(`Guild ${g.guildId} is not available`);
-  const config = await getConfig(g.guildId);
+  // A deleted post or channel cancels it. Any other failure throws, so the next tick retries.
+  if (await isGone(client, g)) {
+    logger.warn({ giveawayId, guildId: g.guildId }, 'Giveaway post or channel is gone, cancelling');
+    return (await cancelGiveaway(client, { id: giveawayId })) ? 'ended' : 'already';
+  }
+  const { guild, config } = await drawContext(client, g.guildId);
   const winners = await pickWinners(
     g.entries.map((e) => e.userId),
     g.winnerCount,
-    async (id) => {
-      try {
-        const member = await guild.members.fetch(id);
-        return (await checkEligible(member, config, new Date())) === null;
-      } catch (err) {
-        if (err instanceof DiscordAPIError && notAMember.has(err.code)) return false;
-        throw err;
-      }
-    },
+    isValidEntrant(guild, config),
   );
   const endedAt = new Date();
   const count = await prisma.$transaction(async (tx) => {

@@ -1,12 +1,18 @@
 import { Events } from 'discord.js';
 import { defineEvent } from '../handlers.js';
+import { cancelGiveaway } from '../services/giveaways.js';
 import { sendLog } from '../services/logs.js';
 import { t } from '../text.js';
 import { clip, embeds, userLine } from '../utils/embeds.js';
+import { logger } from '../utils/logger.js';
 
 export default defineEvent({
   name: Events.MessageDelete,
   async execute(message) {
+    // A deleted giveaway post cancels it. Only the id is needed, so this runs before the early return.
+    void cancelGiveaway(message.client, { messageId: message.id }).catch((err: unknown) =>
+      logger.warn({ err, messageId: message.id }, 'Cancelling a deleted giveaway failed'),
+    );
     const { guild } = message;
     // An uncached message has no author or content, so there's nothing useful to log
     // (and it might be one of the bot's own messages).

@@ -1,13 +1,20 @@
 import { Events } from 'discord.js';
 import { defineEvent } from '../handlers.js';
+import { cancelGiveaway } from '../services/giveaways.js';
 import { sendLog } from '../services/logs.js';
 import { t } from '../text.js';
 import { clip, embeds } from '../utils/embeds.js';
+import { logger } from '../utils/logger.js';
 
 // /purge, ban with message deletion and other bots' cleanups arrive here, not as messageDelete.
 export default defineEvent({
   name: Events.MessageBulkDelete,
   async execute(messages, channel) {
+    for (const messageId of messages.keys()) {
+      void cancelGiveaway(channel.client, { messageId }).catch((err: unknown) =>
+        logger.warn({ err, messageId }, 'Cancelling a deleted giveaway failed'),
+      );
+    }
     // Uncached messages count toward the total but have no content to show.
     const lines = [...messages.values()]
       .flatMap((message) => (message.partial || message.author.bot ? [] : [message]))

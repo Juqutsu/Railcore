@@ -8,10 +8,12 @@ import {
 import { prisma } from '../../database/client.js';
 import { defineCommand } from '../../handlers.js';
 import {
+  cancelGiveaway,
   endGiveaway,
   getManagedGiveaway,
   giveawayChoices,
   requireHost,
+  rerollGiveaway,
   startGiveaway,
 } from '../../services/giveaways.js';
 import { getConfig } from '../../services/guildConfig.js';
@@ -68,6 +70,37 @@ export default defineCommand({
     )
     .addSubcommand((sub) =>
       sub
+        .setName('cancel')
+        .setDescription(t.commands.giveawayCancel)
+        .addIntegerOption((o) =>
+          o
+            .setName('giveaway')
+            .setDescription(t.options.giveawayPick)
+            .setRequired(true)
+            .setAutocomplete(true),
+        ),
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName('reroll')
+        .setDescription(t.commands.giveawayReroll)
+        .addIntegerOption((o) =>
+          o
+            .setName('giveaway')
+            .setDescription(t.options.giveawayPick)
+            .setRequired(true)
+            .setAutocomplete(true),
+        )
+        .addIntegerOption((o) =>
+          o
+            .setName('count')
+            .setDescription(t.options.giveawayRerollCount)
+            .setMinValue(1)
+            .setMaxValue(20),
+        ),
+    )
+    .addSubcommand((sub) =>
+      sub
         .setName('block')
         .setDescription(t.commands.giveawayBlock)
         .addUserOption((o) =>
@@ -119,6 +152,33 @@ export default defineCommand({
         const result = await endGiveaway(interaction.client, giveaway.id);
         await interaction.editReply(
           result === 'ended' ? t.giveaways.endedNow : t.giveaways.alreadyEnded,
+        );
+        return;
+      }
+      case 'cancel': {
+        const giveaway = await getManagedGiveaway(
+          interaction.member,
+          interaction.options.getInteger('giveaway', true),
+        );
+        if (giveaway.endedAt) throw new UserError(t.giveaways.alreadyEnded);
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+        const done = await cancelGiveaway(interaction.client, { id: giveaway.id });
+        await interaction.editReply(done ? t.giveaways.cancelledNow : t.giveaways.alreadyEnded);
+        return;
+      }
+      case 'reroll': {
+        const giveaway = await getManagedGiveaway(
+          interaction.member,
+          interaction.options.getInteger('giveaway', true),
+        );
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+        const winners = await rerollGiveaway(
+          interaction.client,
+          giveaway.id,
+          interaction.options.getInteger('count') ?? 1,
+        );
+        await interaction.editReply(
+          winners.length ? t.giveaways.rerolled : t.giveaways.noEligibleLeft,
         );
         return;
       }
