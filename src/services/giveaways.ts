@@ -1,5 +1,7 @@
 import {
+  DiscordAPIError,
   PermissionFlagsBits,
+  RESTJSONErrorCodes,
   type ApplicationCommandOptionChoiceData,
   type Client,
   type GuildMember,
@@ -80,6 +82,11 @@ async function refreshCount(client: Client, giveawayId: number): Promise<void> {
   );
 }
 
+const notAMember = new Set<unknown>([
+  RESTJSONErrorCodes.UnknownMember,
+  RESTJSONErrorCodes.UnknownUser,
+]);
+
 /**
  * Draws, then commits the winners. The conditional write is what stops a second draw: a losing
  * racer (job vs /giveaway end) discards its draw. A crash before it just redraws next tick.
@@ -95,17 +102,22 @@ export async function endGiveaway(
   if (!g || g.endedAt) return 'already';
   // TODO(Task 5): cancel instead of drawing when the post or channel is gone. Until then the
   // draw is committed and announce() logs the failed edit and ping, and still DMs the host.
+  // Only "not a member" disqualifies. Any other failure (outage, guild unavailable) throws before
+  // the commit, so the next tick redraws instead of committing a wrong draw.
   const guild = client.guilds.cache.get(g.guildId);
+  if (!guild?.available) throw new Error(`Guild ${g.guildId} is not available`);
   const winners = await pickWinners(
     g.entries.map((e) => e.userId),
     g.winnerCount,
-    async (id) =>
-      guild
-        ? guild.members.fetch(id).then(
-            () => true,
-            () => false,
-          )
-        : false,
+    async (id) => {
+      try {
+        await guild.members.fetch(id);
+        return true;
+      } catch (err) {
+        if (err instanceof DiscordAPIError && notAMember.has(err.code)) return false;
+        throw err;
+      }
+    },
   );
   const endedAt = new Date();
   const count = await prisma.$transaction(async (tx) => {
@@ -141,6 +153,8 @@ export async function announce(client: Client, giveawayId: number): Promise<void
         _count: { select: { entries: true } },
       },
     });
+    // A job tick's list can be stale: /giveaway end may have announced it meanwhile.
+    if (!g.endedAt || g.cancelledAt || g.announcedAt) return;
     const winnerIds = g.winners.map((w) => w.userId);
     const log = { giveawayId, guildId: g.guildId };
 
