@@ -67,9 +67,9 @@ model GuildConfig {
   /// Pinged when a giveaway starts; null = no ping.
   giveawayPingRoleId         String?
   /// May host giveaways besides members with Manage Server.
-  giveawayHostRoleIds        String[]
+  giveawayHostRoleIds        String[]  @default([])
   /// Members with one of these roles can't enter.
-  giveawayBlockedRoleIds     String[]
+  giveawayBlockedRoleIds     String[]  @default([])
   /// Members with an active warning can't enter.
   giveawayBlockWarned        Boolean   @default(false)
   /// Only warnings of the last X days block entry; 0 = all active warnings.
