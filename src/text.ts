@@ -606,12 +606,14 @@ export const t = {
     title: 'Railcore setup',
     intro: 'Pick a setting below to change it. Changes save instantly.',
     notSet: '`Not set`',
+    allWarnings: 'All active warnings',
     days: (n: number) => (n === 0 ? 'Off' : `${n} day${n === 1 ? '' : 's'}`),
     groups: {
       verification: 'Verification',
       welcome: 'Welcome & leave',
       tickets: 'Tickets & applications',
       logs: 'Logs',
+      giveaways: 'Giveaways',
       stats: 'Server stats',
       updates: 'Game updates',
       game: 'Game',
@@ -648,7 +650,8 @@ export const t = {
     panelNotFound:
       "I couldn't find the ticket panel to update. Run `/ticket-panel` to post a new one.",
     units: { days: 'Days', hours: 'Hours' },
-    numberHint: (max: number) => `Whole number from 0 to ${max}. 0 turns it off.`,
+    numberHint: (max: number, zero?: string) =>
+      `Whole number from 0 to ${max}. ${zero ? `0 = ${zero.toLowerCase()}.` : '0 turns it off.'}`,
     invalidNumber: (max: number) => `Enter a whole number from 0 to ${max}.`,
     customText: '`Custom`',
     defaultText: '`Default`',
@@ -769,6 +772,34 @@ export const t = {
         label: 'Boost count name',
         description:
           'Name of the boost count channel. Discord allows only 2 renames per 10 minutes.',
+      },
+      giveawayChannelId: {
+        label: 'Giveaway channel',
+        description: 'Default channel for /giveaway start.',
+      },
+      giveawayPingRoleId: {
+        label: 'Giveaway ping role',
+        description: 'Pinged when a giveaway starts. Not set = no ping.',
+      },
+      giveawayHostRoleIds: {
+        label: 'Giveaway host roles',
+        description: 'Can host giveaways besides Manage Server.',
+      },
+      giveawayBlockedRoleIds: {
+        label: 'Giveaway blocked roles',
+        description: "Members with these roles can't enter giveaways.",
+      },
+      giveawayBlockWarned: {
+        label: 'Block warned members',
+        description: "Members with an active warning can't enter giveaways.",
+      },
+      giveawayWarnDays: {
+        label: 'Warning lookback',
+        description: 'Only warnings of the last X days block entry.',
+      },
+      giveawayWinnerCooldownDays: {
+        label: 'Winner cooldown',
+        description: "Winners of the last X days can't enter.",
       },
     },
   },

@@ -10,59 +10,73 @@ datasource db {
 }
 
 model GuildConfig {
-  guildId               String   @id
-  verificationChannelId String?
-  verifiedRoleId        String?
-  minAccountAgeDays     Int      @default(7)
-  ticketCategoryId      String?
-  ticketLogChannelId    String?
-  staffRoleIds          String[] @default([])
-  applicationRoleId     String?
-  modLogChannelId       String?
-  serverLogChannelId    String?
-  ticketCounter         Int      @default(0)
-  caseCounter           Int      @default(0)
+  guildId                    String    @id
+  verificationChannelId      String?
+  verifiedRoleId             String?
+  minAccountAgeDays          Int       @default(7)
+  ticketCategoryId           String?
+  ticketLogChannelId         String?
+  staffRoleIds               String[]  @default([])
+  applicationRoleId          String?
+  modLogChannelId            String?
+  serverLogChannelId         String?
+  ticketCounter              Int       @default(0)
+  caseCounter                Int       @default(0)
   /// Hours of silence (after staff spoke last) before the opener is reminded; 0 = off.
-  ticketReminderHours   Int      @default(24)
+  ticketReminderHours        Int       @default(24)
   /// Hours after the reminder until the ticket closes itself; 0 = never.
-  ticketAutoCloseHours  Int      @default(24)
-  welcomeChannelId      String?
+  ticketAutoCloseHours       Int       @default(24)
+  welcomeChannelId           String?
   /// Custom greeting with {user} {name} {server} {count}; null = default text.
-  welcomeMessage        String?
-  leaveChannelId        String?
+  welcomeMessage             String?
+  leaveChannelId             String?
   /// Custom leave text, same placeholders; null = default text.
-  leaveMessage          String?
+  leaveMessage               String?
   /// Off greys out the Staff Application button and refuses new applications.
-  applicationsOpen      Boolean  @default(true)
+  applicationsOpen           Boolean   @default(true)
   /// The last ticket panel posted, so toggling applications can update it in place.
-  ticketPanelChannelId  String?
-  ticketPanelMessageId  String?
+  ticketPanelChannelId       String?
+  ticketPanelMessageId       String?
   /// Where rank-ups from XP roles are announced; null = not announced.
-  rankUpChannelId       String?
+  rankUpChannelId            String?
   /// Start of the last full Bloxlink pass for XP roles; it runs daily to find new links.
-  xpRolesSyncedAt       DateTime?
+  xpRolesSyncedAt            DateTime?
   /// Voice channel renamed to the number of players in the game; null = off.
-  playerCountChannelId  String?
+  playerCountChannelId       String?
   /// Custom channel name with {count}; null = default name.
-  playerCountName       String?
+  playerCountName            String?
   /// Voice channel renamed to the member count; null = off.
-  memberCountChannelId  String?
-  memberCountName       String?
+  memberCountChannelId       String?
+  memberCountName            String?
   /// Voice channel renamed to the number of server boosts; null = off.
-  boostCountChannelId   String?
-  boostCountName        String?
+  boostCountChannelId        String?
+  boostCountName             String?
   /// Posts in gameUpdateChannelId when the game is published.
-  gameUpdatesOn         Boolean  @default(false)
-  gameUpdateChannelId   String?
+  gameUpdatesOn              Boolean   @default(false)
+  gameUpdateChannelId        String?
   /// Pinged with each update post; null = no ping.
-  gameUpdatePingRoleId  String?
+  gameUpdatePingRoleId       String?
   /// Custom text of the update post; null = default text.
-  gameUpdateMessage     String?
+  gameUpdateMessage          String?
   /// The game's last publish time the bot saw, tracked even while posts are off.
-  gameUpdatedAt         DateTime?
+  gameUpdatedAt              DateTime?
   /// Last update post, so a burst of hotfixes gives one post per hour.
-  gameUpdateAnnouncedAt DateTime?
-  updatedAt             DateTime @updatedAt
+  gameUpdateAnnouncedAt      DateTime?
+  /// Default channel for /giveaway start; null = the host must pick one.
+  giveawayChannelId          String?
+  /// Pinged when a giveaway starts; null = no ping.
+  giveawayPingRoleId         String?
+  /// May host giveaways besides members with Manage Server.
+  giveawayHostRoleIds        String[]
+  /// Members with one of these roles can't enter.
+  giveawayBlockedRoleIds     String[]
+  /// Members with an active warning can't enter.
+  giveawayBlockWarned        Boolean   @default(false)
+  /// Only warnings of the last X days block entry; 0 = all active warnings.
+  giveawayWarnDays           Int       @default(0)
+  /// Winners of the last X days can't enter; 0 = off.
+  giveawayWinnerCooldownDays Int       @default(0)
+  updatedAt                  DateTime  @updatedAt
 }
 
 /// A role members get once their in-game XP reaches `minXp`. Tiers stack.
@@ -115,33 +129,33 @@ enum ApplicationStatus {
 }
 
 model Ticket {
-  id           Int                @id @default(autoincrement())
-  guildId      String
+  id                Int                @id @default(autoincrement())
+  guildId           String
   /// Per-guild number shown to users ("support-0042").
-  number       Int
-  type         TicketType
-  status       TicketStatus       @default(OPEN)
-  openerId     String
+  number            Int
+  type              TicketType
+  status            TicketStatus       @default(OPEN)
+  openerId          String
   /// Null only while the channel is being created.
-  channelId    String?            @unique
+  channelId         String?            @unique
   /// Modal answers as [{ label, value }].
-  answers      Json
+  answers           Json
   /// "guild:user:type" while open, null once closed. Its unique index enforces one open ticket per user per type.
-  openKey      String?            @unique
-  claimedById  String?
-  closedById   String?
-  closeReason  String?
-  appStatus    ApplicationStatus?
-  reviewedById String?
-  reviewReason String?
-  reviewedAt   DateTime?
+  openKey           String?            @unique
+  claimedById       String?
+  closedById        String?
+  closeReason       String?
+  appStatus         ApplicationStatus?
+  reviewedById      String?
+  reviewReason      String?
+  reviewedAt        DateTime?
   /// The inactivity reminder, while it is still the latest message in the channel.
   reminderMessageId String?
-  remindedAt   DateTime?
+  remindedAt        DateTime?
   /// Player reports: the reported Roblox account, so later reports can show how often it was reported.
-  reportedRobloxId String?
-  createdAt    DateTime           @default(now())
-  closedAt     DateTime?
+  reportedRobloxId  String?
+  createdAt         DateTime           @default(now())
+  closedAt          DateTime?
 
   @@unique([guildId, number])
   @@index([guildId, reportedRobloxId])
@@ -178,4 +192,59 @@ model ModCase {
 
   @@unique([guildId, number])
   @@index([guildId, targetId])
+}
+
+model Giveaway {
+  id          Int              @id @default(autoincrement())
+  guildId     String
+  channelId   String
+  /// Null only while the message is being posted.
+  messageId   String?          @unique
+  hostId      String
+  prize       String
+  winnerCount Int
+  endsAt      DateTime
+  /// Set together with the winners in one conditional write; that write is what stops a second draw.
+  endedAt     DateTime?
+  /// Set once the ended embed, winner ping and host DM were attempted. Null after endedAt = retry.
+  announcedAt DateTime?
+  /// Set with endedAt when cancelled: no winners, no announcement.
+  cancelledAt DateTime?
+  createdAt   DateTime         @default(now())
+  entries     GiveawayEntry[]
+  winners     GiveawayWinner[]
+
+  @@index([endedAt, endsAt])
+  @@index([guildId, endedAt])
+}
+
+/// One row per win, rerolls included. `wonAt` drives the winner cooldown.
+model GiveawayWinner {
+  giveawayId Int
+  userId     String
+  wonAt      DateTime @default(now())
+  giveaway   Giveaway @relation(fields: [giveawayId], references: [id], onDelete: Cascade)
+
+  @@id([giveawayId, userId])
+  @@index([userId, wonAt])
+}
+
+model GiveawayEntry {
+  giveawayId Int
+  userId     String
+  createdAt  DateTime @default(now())
+  giveaway   Giveaway @relation(fields: [giveawayId], references: [id], onDelete: Cascade)
+
+  @@id([giveawayId, userId])
+}
+
+/// Members barred from every giveaway of the guild.
+model GiveawayBlock {
+  guildId   String
+  userId    String
+  addedById String
+  reason    String?
+  createdAt DateTime @default(now())
+
+  @@id([guildId, userId])
 }

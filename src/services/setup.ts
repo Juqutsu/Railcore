@@ -21,7 +21,13 @@ import { POST_PERMISSIONS as POST } from '../utils/permissions.js';
 
 export type SettingKey = keyof typeof t.setup.settings;
 
-type NumberSetting = { kind: 'number'; unit: keyof typeof t.setup.units; max: number };
+/** `zero`: what a stored 0 means, shown instead of "Off". */
+type NumberSetting = {
+  kind: 'number';
+  unit: keyof typeof t.setup.units;
+  max: number;
+  zero?: string;
+};
 /**
  * Stored as null while the default text (`fallback`) is used. `placeholders` and `hint` default to
  * the welcome texts' ones. A custom text must contain `requires`, if set.
@@ -91,12 +97,19 @@ export const SETTINGS: Record<SettingKey, Setting> = {
     placeholders: t.gameUpdates.placeholders,
     hint: t.gameUpdates.hint,
   },
+  giveawayChannelId: { kind: 'channel', permissions: POST },
+  giveawayPingRoleId: { kind: 'pingRole' },
+  giveawayHostRoleIds: { kind: 'roles' },
+  giveawayBlockedRoleIds: { kind: 'roles' },
+  giveawayBlockWarned: { kind: 'toggle' },
+  giveawayWarnDays: { kind: 'number', unit: 'days', max: 365, zero: t.setup.allWarnings },
+  giveawayWinnerCooldownDays: { kind: 'number', unit: 'days', max: 365 },
 };
 
 /** The dashboard menu value for the XP roles page, which lives in its own table, not GuildConfig. */
 export const XP_ROLES_PICK = 'xpRoles';
 
-const GROUPS: { name: keyof typeof t.setup.groups; keys: SettingKey[] }[] = [
+export const GROUPS: { name: keyof typeof t.setup.groups; keys: SettingKey[] }[] = [
   { name: 'verification', keys: ['verificationChannelId', 'verifiedRoleId', 'minAccountAgeDays'] },
   {
     name: 'welcome',
@@ -115,6 +128,18 @@ const GROUPS: { name: keyof typeof t.setup.groups; keys: SettingKey[] }[] = [
     ],
   },
   { name: 'logs', keys: ['modLogChannelId', 'serverLogChannelId'] },
+  {
+    name: 'giveaways',
+    keys: [
+      'giveawayChannelId',
+      'giveawayPingRoleId',
+      'giveawayHostRoleIds',
+      'giveawayBlockedRoleIds',
+      'giveawayBlockWarned',
+      'giveawayWarnDays',
+      'giveawayWinnerCooldownDays',
+    ],
+  },
   {
     name: 'stats',
     keys: [
@@ -135,7 +160,7 @@ const GROUPS: { name: keyof typeof t.setup.groups; keys: SettingKey[] }[] = [
 ];
 
 /** These groups get their own menu, because one menu holds at most 25 entries. */
-const GAME_GROUPS: readonly string[] = ['stats', 'updates', 'game'];
+export const GAME_GROUPS: readonly string[] = ['stats', 'updates', 'game'];
 
 /** Why `text` can't be saved for this setting, or null. Empty text means "use the default". */
 export function textProblem(key: SettingKey, text: string): string | null {
@@ -152,7 +177,9 @@ export const isSettingKey = (key: string | undefined): key is SettingKey =>
 function formatValue(config: GuildConfig, key: SettingKey): string {
   const value = config[key];
   const setting = SETTINGS[key];
-  if (setting.kind === 'number' && typeof value === 'number') return t.setup[setting.unit](value);
+  if (setting.kind === 'number' && typeof value === 'number') {
+    return value === 0 && setting.zero ? setting.zero : t.setup[setting.unit](value);
+  }
   if (setting.kind === 'text') return value ? t.setup.customText : t.setup.defaultText;
   if (setting.kind === 'toggle') return value ? t.setup.on : t.setup.off;
   if (Array.isArray(value)) {
@@ -311,7 +338,7 @@ export function numberModal(
     .addLabelComponents(
       new LabelBuilder()
         .setLabel(t.setup.units[setting.unit])
-        .setDescription(t.setup.numberHint(setting.max))
+        .setDescription(t.setup.numberHint(setting.max, setting.zero))
         .setTextInputComponent(
           new TextInputBuilder()
             .setCustomId('value')
