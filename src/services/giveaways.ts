@@ -177,6 +177,11 @@ const goneCodes = new Set<unknown>([
   RESTJSONErrorCodes.UnknownMessage,
 ]);
 
+const noAccess = new Set<unknown>([
+  RESTJSONErrorCodes.MissingAccess,
+  RESTJSONErrorCodes.MissingPermissions,
+]);
+
 /** True when Discord says the giveaway's channel or post no longer exists. */
 async function isGone(client: Client, g: Giveaway): Promise<boolean> {
   if (!g.messageId) return false;
@@ -186,7 +191,11 @@ async function isGone(client: Client, g: Giveaway): Promise<boolean> {
     await channel.messages.fetch(g.messageId);
     return false;
   } catch (err) {
-    if (err instanceof DiscordAPIError && goneCodes.has(err.code)) return true;
+    if (err instanceof DiscordAPIError) {
+      if (goneCodes.has(err.code)) return true;
+      // Can't read the post (no history/view access): not proof it's gone, so draw as usual.
+      if (noAccess.has(err.code)) return false;
+    }
     throw err;
   }
 }
