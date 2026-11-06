@@ -9,6 +9,7 @@ import {
 } from '../handlers.js';
 import { t } from '../text.js';
 import { handleInteractionError, UserError } from '../utils/errors.js';
+import { logger } from '../utils/logger.js';
 
 export default defineEvent({
   name: Events.InteractionCreate,
@@ -16,6 +17,18 @@ export default defineEvent({
     // Every command is guild-only and every component lives in a guild message. Other servers'
     // interactions never get here: handlers.ts drops them (see services/guildLock.ts).
     if (!interaction.inCachedGuild()) return;
+
+    if (interaction.isAutocomplete()) {
+      const command = commands.get(commandKey(interaction.commandType, interaction.commandName));
+      try {
+        await command?.autocomplete?.(interaction);
+      } catch (err) {
+        logger.warn({ err, command: interaction.commandName }, 'Autocomplete failed');
+      }
+      // An empty list beats Discord's "Loading options failed".
+      if (!interaction.responded) await interaction.respond([]).catch(() => undefined);
+      return;
+    }
 
     try {
       if (

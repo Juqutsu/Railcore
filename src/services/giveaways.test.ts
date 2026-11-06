@@ -1,6 +1,37 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import type { GuildMember } from 'discord.js';
+import type { Giveaway, GuildConfig } from '../generated/prisma/client.js';
 import { giveawayMessage, type GiveawayView } from './giveawayMessage.js';
+import { canManage, choiceName } from './giveawayRules.js';
+
+const cfg = (overrides: Partial<GuildConfig>) => overrides as GuildConfig;
+const member = (id: string, roleIds: string[], opts: { manageGuild?: boolean } = {}) =>
+  ({
+    id,
+    permissions: { has: () => opts.manageGuild ?? false },
+    roles: { cache: new Set(roleIds) },
+  }) as unknown as GuildMember;
+
+void test('host role can only manage own giveaways; Manage Server manages all', () => {
+  const config = cfg({ giveawayHostRoleIds: ['host'] });
+  const g = { hostId: 'alice' } as Giveaway;
+  assert.equal(canManage(member('alice', ['host']), config, g), true);
+  assert.equal(canManage(member('bob', ['host']), config, g), false);
+  assert.equal(canManage(member('admin', [], { manageGuild: true }), config, g), true);
+  assert.equal(canManage(member('eve', []), config, g), false);
+});
+
+void test('autocomplete names keep the date and fit 100 characters', () => {
+  const date = new Date('2026-11-06T14:30:00Z');
+  assert.equal(
+    choiceName({ prize: 'Nitro', endsAt: date, endedAt: null }),
+    'Nitro · ends 2026-11-06 14:30 UTC',
+  );
+  const long = choiceName({ prize: 'x'.repeat(200), endsAt: date, endedAt: date });
+  assert.equal(long.length, 100);
+  assert.match(long, / · ended 2026-11-06 14:30 UTC$/);
+});
 
 type ButtonJson = { custom_id: string; label: string; disabled?: boolean };
 

@@ -1,5 +1,6 @@
 import { ActivityType, Events, RESTEvents } from 'discord.js';
 import { defineEvent } from '../handlers.js';
+import { startGiveaways } from '../services/giveaways.js';
 import { leaveForeignGuilds, servedScope } from '../services/guildLock.js';
 import { startServerStats } from '../services/serverStats.js';
 import { startTicketReminders } from '../services/ticketReminders.js';
@@ -22,6 +23,7 @@ export default defineEvent({
     startTicketReminders(client);
     startXpRoleSync(client);
     startServerStats(client);
+    startGiveaways(client);
     void leaveForeignGuilds(client);
     logger.info({ serving: servedScope() }, 'Handling events for this server only');
     logger.info({ user: client.user.tag, guilds: client.guilds.cache.size }, 'Railcore is online');

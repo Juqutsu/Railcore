@@ -4,6 +4,7 @@ import { pathToFileURL } from 'node:url';
 import {
   ApplicationCommandType,
   type AnySelectMenuInteraction,
+  type AutocompleteInteraction,
   type ButtonInteraction,
   type ChatInputCommandInteraction,
   type Client,
@@ -25,6 +26,7 @@ type CommandInteraction =
 export interface Command<I extends CommandInteraction = CommandInteraction> {
   data: { name: string; toJSON(): RESTPostAPIApplicationCommandsJSONBody };
   execute(interaction: I): Promise<unknown>;
+  autocomplete?(interaction: AutocompleteInteraction<'cached'>): Promise<unknown>;
 }
 
 export interface Event<K extends keyof ClientEvents = keyof ClientEvents> {

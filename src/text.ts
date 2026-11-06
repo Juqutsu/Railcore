@@ -41,6 +41,7 @@ export const t = {
     leaderboard: 'Show the top 100 drivers of Falkenberg Railways',
     giveaway: 'Host and manage giveaways',
     giveawayStart: 'Start a giveaway',
+    giveawayEnd: 'End a giveaway now and draw the winners',
   },
 
   /** Right-click menu entries (Apps). Max 32 characters; re-register commands after changing. */
@@ -69,6 +70,7 @@ export const t = {
     giveawayDuration: 'How long it runs, e.g. 30m, 2h or 1d (1 minute to 30 days)',
     giveawayWinners: 'How many winners (default: 1)',
     giveawayChannel: 'Where to post it (default: the giveaway channel from /setup)',
+    giveawayPick: 'Which giveaway',
   },
 
   giveaways: {
@@ -96,6 +98,18 @@ export const t = {
     alreadyEntered: "You're already entered.",
     leave: 'Leave giveaway',
     left: 'You left the giveaway.',
+    notYours: 'You can only manage your own giveaways.',
+    notFound: "That giveaway doesn't exist.",
+    alreadyEnded: 'That giveaway already ended.',
+    endedNow: 'Ended.',
+    choiceEnds: 'ends',
+    choiceEnded: 'ended',
+    winnerPing: (winnerIds: string[], prize: string, hostId: string) =>
+      `🎉 Congratulations ${winnerIds.map((id) => `<@${id}>`).join(', ')}! You won **${prize}**. <@${hostId}> will DM you your prize.`,
+    hostDm: (prize: string, winnerIds: string[]) =>
+      winnerIds.length
+        ? `Your giveaway **${prize}** ended. Winner(s): ${winnerIds.map((id) => `<@${id}>`).join(', ')}. Send them their prize.`
+        : `Your giveaway **${prize}** ended. No valid entries, so there is no winner.`,
   },
 
   time: {

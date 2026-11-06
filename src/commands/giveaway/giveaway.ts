@@ -1,6 +1,11 @@
 import { ChannelType, InteractionContextType, MessageFlags, SlashCommandBuilder } from 'discord.js';
 import { defineCommand } from '../../handlers.js';
-import { startGiveaway } from '../../services/giveaways.js';
+import {
+  endGiveaway,
+  getManagedGiveaway,
+  giveawayChoices,
+  startGiveaway,
+} from '../../services/giveaways.js';
 import { t } from '../../text.js';
 import { parseDuration } from '../../utils/duration.js';
 import { UserError } from '../../utils/errors.js';
@@ -38,7 +43,26 @@ export default defineCommand({
             .setDescription(t.options.giveawayChannel)
             .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement),
         ),
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName('end')
+        .setDescription(t.commands.giveawayEnd)
+        .addIntegerOption((o) =>
+          o
+            .setName('giveaway')
+            .setDescription(t.options.giveawayPick)
+            .setRequired(true)
+            .setAutocomplete(true),
+        ),
     ),
+
+  async autocomplete(interaction) {
+    const state = interaction.options.getSubcommand() === 'reroll' ? 'ended' : 'running';
+    await interaction.respond(
+      await giveawayChoices(interaction.member, interaction.options.getFocused(), state),
+    );
+  },
 
   async execute(interaction) {
     switch (interaction.options.getSubcommand()) {
@@ -53,6 +77,19 @@ export default defineCommand({
           channel: interaction.options.getChannel('channel'),
         });
         await interaction.editReply(t.giveaways.started(giveaway.url));
+        return;
+      }
+      case 'end': {
+        const giveaway = await getManagedGiveaway(
+          interaction.member,
+          interaction.options.getInteger('giveaway', true),
+        );
+        if (giveaway.endedAt) throw new UserError(t.giveaways.alreadyEnded);
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+        const result = await endGiveaway(interaction.client, giveaway.id);
+        await interaction.editReply(
+          result === 'ended' ? t.giveaways.endedNow : t.giveaways.alreadyEnded,
+        );
         return;
       }
     }
