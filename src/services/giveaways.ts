@@ -76,6 +76,14 @@ export async function startGiveaway(
     input.channel ??
     (config.giveawayChannelId ? member.guild.channels.cache.get(config.giveawayChannelId) : null);
   if (!channel?.isTextBased()) throw new UserError(t.giveaways.noChannel);
+  if (
+    input.channel &&
+    !channel
+      .permissionsFor(member)
+      .has([PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages])
+  ) {
+    throw new UserError(t.giveaways.memberCantPost);
+  }
   const missing = missingPermissions(channel, POST_PERMISSIONS);
   if (missing.length) throw new UserError(t.giveaways.cantPost(channel.toString(), missing));
 

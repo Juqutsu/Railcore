@@ -75,6 +75,7 @@ export const t = {
     cantHost: "You can't host giveaways.",
     ended: 'This giveaway has ended.',
     noChannel: 'Set a giveaway channel in /setup or pick one.',
+    memberCantPost: "You can't post in that channel.",
     badDuration: 'Use a duration between 1 minute and 30 days, like `30m`, `2h` or `1d12h`.',
     cantPost: (channel: string, missing: string[]) =>
       `I can't post in ${channel}. Missing: ${missing.join(', ')}.`,
