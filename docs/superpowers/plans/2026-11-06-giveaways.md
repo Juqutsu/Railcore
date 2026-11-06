@@ -34,6 +34,7 @@
 ### Task 1: Schema + `/setup` "Giveaways" group
 
 **Files:**
+
 - Modify: `prisma/schema.prisma` (7 `GuildConfig` columns; models `Giveaway`, `GiveawayEntry`, `GiveawayWinner`, `GiveawayBlock` exactly as in spec "Data model", including `cancelledAt`)
 - Create: migration via `npm run db:migrate -- --name giveaways`
 - Modify: `src/services/setup.ts` (SETTINGS, GROUPS, `NumberSetting`, `formatValue`, number modal hint)
@@ -42,6 +43,7 @@
 - Test: `src/services/setup.test.ts`
 
 **Interfaces:**
+
 - Produces: `GuildConfig` fields `giveawayChannelId: string | null`, `giveawayPingRoleId: string | null`, `giveawayHostRoleIds: string[]`, `giveawayBlockedRoleIds: string[]`, `giveawayBlockWarned: boolean` (default false), `giveawayWarnDays: number` (default 0), `giveawayWinnerCooldownDays: number` (default 0). Prisma models `Giveaway`, `GiveawayEntry`, `GiveawayWinner`, `GiveawayBlock`.
 - Produces: `export const GROUPS` (now exported) and `export const GAME_GROUPS` from `setup.ts`.
 
@@ -59,8 +61,13 @@ void test('each setup menu fits Discord’s 25-option limit', () => {
 void test('giveaway settings are in the Giveaways group', () => {
   const group = GROUPS.find((g) => g.name === 'giveaways');
   assert.deepEqual(group?.keys, [
-    'giveawayChannelId', 'giveawayPingRoleId', 'giveawayHostRoleIds', 'giveawayBlockedRoleIds',
-    'giveawayBlockWarned', 'giveawayWarnDays', 'giveawayWinnerCooldownDays',
+    'giveawayChannelId',
+    'giveawayPingRoleId',
+    'giveawayHostRoleIds',
+    'giveawayBlockedRoleIds',
+    'giveawayBlockWarned',
+    'giveawayWarnDays',
+    'giveawayWinnerCooldownDays',
   ]);
 });
 ```
@@ -85,6 +92,7 @@ void test('giveaway settings are in the Giveaways group', () => {
 ### Task 2: `/giveaway start`, Enter/Leave buttons, live count
 
 **Files:**
+
 - Create: `src/services/giveaways.ts`
 - Create: `src/commands/giveaway/giveaway.ts`
 - Create: `src/interactions/buttons/giveaway-enter.ts`, `src/interactions/buttons/giveaway-leave.ts`
@@ -93,6 +101,7 @@ void test('giveaway settings are in the Giveaways group', () => {
 - Test: `src/services/giveaways.test.ts`
 
 **Interfaces:**
+
 - Consumes: Task 1 schema/config fields.
 - Produces (in `giveaways.ts`):
   - `type GiveawayView = Giveaway & { winnerIds: string[] }`
@@ -162,6 +171,7 @@ void test('cancelled giveaway shows "Cancelled"', () => {
 ### Task 3: Draw, end job, `/giveaway end`, autocomplete
 
 **Files:**
+
 - Create: `src/utils/draw.ts`, `src/utils/draw.test.ts`
 - Modify: `src/services/giveaways.ts`, `src/services/giveaways.test.ts`
 - Modify: `src/commands/giveaway/giveaway.ts` (subcommand `end`, `autocomplete`)
@@ -169,6 +179,7 @@ void test('cancelled giveaway shows "Cancelled"', () => {
 - Modify: `src/events/ready.ts` (`startGiveaways(client)`)
 
 **Interfaces:**
+
 - Produces (`draw.ts`):
   - `shuffle<T>(items: readonly T[], randomInt?: (maxExclusive: number) => number): T[]` — Fisher–Yates, default `crypto.randomInt`, returns a copy.
   - `pickWinners(candidates: readonly string[], count: number, isValid: (id: string) => Promise<boolean>, randomInt?: (n: number) => number): Promise<string[]>` — shuffles, walks in order, keeps valid ones until `count`, returns ≤ `count` distinct ids.
@@ -184,7 +195,10 @@ void test('cancelled giveaway shows "Cancelled"', () => {
 - [ ] **Step 1: Write failing tests** `draw.test.ts`
 
 ```ts
-const seq = (...xs: number[]) => () => xs.shift() ?? 0; // fake randomInt
+const seq =
+  (...xs: number[]) =>
+  () =>
+    xs.shift() ?? 0; // fake randomInt
 void test('picks distinct winners up to count', async () => {
   const w = await pickWinners(['a', 'b', 'c', 'd'], 2, async () => true);
   assert.equal(w.length, 2);
@@ -240,12 +254,14 @@ void test('host role can only manage own giveaways; Manage Server manages all', 
 ### Task 4: Blacklist — eligibility, `block` / `unblock` / `blocklist`
 
 **Files:**
+
 - Modify: `src/services/giveaways.ts`, `src/services/giveaways.test.ts`
 - Modify: `src/commands/giveaway/giveaway.ts`
 - Modify: `src/interactions/buttons/giveaway-enter.ts`
 - Modify: `src/text.ts`
 
 **Interfaces:**
+
 - Produces:
   - `type EligibilityFacts = { roleIds: readonly string[]; blocked: boolean; hasActiveWarning: boolean; wonRecently: boolean }`
   - `ineligibleReason(facts: EligibilityFacts, config: GuildConfig): string | null` — pure; order and copy from spec "Eligibility"; warnings only count if `config.giveawayBlockWarned`; `wonRecently` only if `config.giveawayWinnerCooldownDays > 0` (cooldown text includes X).
@@ -299,11 +315,13 @@ void test('eligible member gets null', () => {
 ### Task 5: Reroll, cancel, delete-as-cancel, README
 
 **Files:**
+
 - Modify: `src/services/giveaways.ts`, `src/commands/giveaway/giveaway.ts`
 - Modify: `src/events/messageDelete.ts`, `src/events/messageDeleteBulk.ts`
 - Modify: `src/text.ts`, `README.md` (Features, Commands, "Set it up in Discord")
 
 **Interfaces:**
+
 - Produces:
   - `cancelGiveaway(client: Client, where: { id: number } | { messageId: string }): Promise<boolean>` — conditional `updateMany({ where: { ...where, endedAt: null }, data: { endedAt: now, cancelledAt: now } })`; true if it cancelled; then best-effort edit of the message to the cancelled state. No ping, no DM.
   - `rerollGiveaway(client: Client, giveawayId: number, count: number): Promise<string[]>` — spec "Reroll": candidates = entries minus existing winners, same `pickWinners` + eligibility; insert `GiveawayWinner` rows (`wonAt` now); edit embed to list all winners; post a new ping for the new winners only. Returns new winner ids (empty → caller shows "No eligible entries left.").

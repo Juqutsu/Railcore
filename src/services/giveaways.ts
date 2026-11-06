@@ -248,6 +248,7 @@ export async function rerollGiveaway(
   if (!g) throw new UserError(t.giveaways.notFound);
   if (!g.endedAt) throw new UserError(t.giveaways.notEnded);
   if (g.cancelledAt) throw new UserError(t.giveaways.wasCancelled);
+  if (!g.announcedAt) throw new UserError(t.giveaways.stillAnnouncing);
   const { guild, config } = await drawContext(client, g.guildId);
   const won = new Set(g.winners.map((w) => w.userId));
   const picked = await pickWinners(
@@ -305,7 +306,7 @@ export async function rerollGiveaway(
 export async function endGiveaway(
   client: Client,
   giveawayId: number,
-): Promise<'ended' | 'already'> {
+): Promise<'ended' | 'cancelled' | 'already'> {
   const g = await prisma.giveaway.findUnique({
     where: { id: giveawayId },
     include: { entries: { select: { userId: true } } },
@@ -314,7 +315,7 @@ export async function endGiveaway(
   // A deleted post or channel cancels it. Any other failure throws, so the next tick retries.
   if (await isGone(client, g)) {
     logger.warn({ giveawayId, guildId: g.guildId }, 'Giveaway post or channel is gone, cancelling');
-    return (await cancelGiveaway(client, { id: giveawayId })) ? 'ended' : 'already';
+    return (await cancelGiveaway(client, { id: giveawayId })) ? 'cancelled' : 'already';
   }
   const { guild, config } = await drawContext(client, g.guildId);
   const winners = await pickWinners(
@@ -365,20 +366,25 @@ export async function announce(client: Client, giveawayId: number): Promise<void
       logger.warn({ err, ...log }, 'Giveaway channel is gone');
       return null;
     });
-    if (channel?.isSendable() && g.messageId) {
-      try {
-        await channel.messages.edit(
-          g.messageId,
-          giveawayMessage({ ...g, winnerIds }, g._count.entries),
-        );
-      } catch (err) {
-        logger.warn({ err, ...log }, 'Could not edit the ended giveaway');
+    if (channel?.isSendable()) {
+      if (g.messageId) {
+        try {
+          await channel.messages.edit(
+            g.messageId,
+            giveawayMessage({ ...g, winnerIds }, g._count.entries),
+          );
+        } catch (err) {
+          logger.warn({ err, ...log }, 'Could not edit the ended giveaway');
+        }
       }
       if (winnerIds.length) {
         try {
+          // No post id (crash between send and save): still ping, just not as a reply.
           await channel.send({
             content: t.giveaways.winnerPing(winnerIds, g.prize, g.hostId),
-            reply: { messageReference: g.messageId, failIfNotExists: false },
+            ...(g.messageId && {
+              reply: { messageReference: g.messageId, failIfNotExists: false },
+            }),
             allowedMentions: { users: [...winnerIds, g.hostId] },
           });
         } catch (err) {
@@ -482,7 +488,7 @@ export async function startGiveaway(
   ) {
     throw new UserError(t.giveaways.memberCantPost);
   }
-  const missing = missingPermissions(channel, POST_PERMISSIONS);
+  const missing = missingPermissions(channel, [...POST_PERMISSIONS, 'ReadMessageHistory']);
   if (missing.length) throw new UserError(t.giveaways.cantPost(channel.toString(), missing));
 
   const giveaway = await prisma.giveaway.create({

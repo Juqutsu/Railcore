@@ -53,12 +53,14 @@ shouldn't win (blocked, warned, recent winners) can't.
 ## What was decided (by the user)
 
 **Entering**
+
 - Button "🎉 Enter" under the giveaway message. One click enters.
 - Ephemeral answer: "You're in!".
 - Clicking again: "You're already entered." with a **Leave giveaway** button.
 - Blocked: ephemeral refusal that names the reason (e.g. "You have an active warning.").
 
 **Look** — layout A (compact), mocked up during brainstorming:
+
 - Embed (brand color) titled `🎉 <prize>`. Description: "Click **Enter** below to join!", then
   **Ends:** relative Discord timestamp plus absolute date, **Winners:** n, **Hosted by:** @host.
 - Entry count shown on the button: `🎉 Enter · 42`.
@@ -68,12 +70,14 @@ shouldn't win (blocked, warned, recent winners) can't.
   **<prize>**. @host will DM you your prize."
 
 **Hosting**
+
 - Only owner/admins host. Which roles may host is configured in `/setup`.
 - Host sets prize, duration and number of winners.
 - Default giveaway channel and an optional ping role are set in `/setup`; `/giveaway start` can
   override the channel.
 
 **Blacklist** — global, same for every giveaway:
+
 - Manual: blocked roles (in `/setup`) and blocked users (`/giveaway block @user`,
   `/giveaway unblock @user`, `/giveaway blocklist`).
 - Automatic, switchable in `/setup`: members with active warnings; winners of the last X days.
@@ -84,15 +88,15 @@ shouldn't win (blocked, warned, recent winners) can't.
 
 ### Commands — `/giveaway` with subcommands
 
-| Subcommand | Options |
-|---|---|
-| `start` | `prize` (string, required, max 200), `duration` (string, required, `parseDuration` format like `/timeout`: "2h", "1d12h"; min 1 minute, max 30 days), `winners` (int 1–20, default 1), `channel` (text channel, optional) |
-| `end` | `giveaway` (autocomplete over running giveaways) — ends now and draws |
-| `reroll` | `giveaway` (autocomplete over ended giveaways), `count` (int 1–20, default 1) |
-| `cancel` | `giveaway` (autocomplete over running giveaways) — ends without winners |
-| `block` | `user` (required), `reason` (optional, max 200) |
-| `unblock` | `user` (required) |
-| `blocklist` | — ephemeral list of blocked users with who blocked them and why |
+| Subcommand  | Options                                                                                                                                                                                                                   |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `start`     | `prize` (string, required, max 200), `duration` (string, required, `parseDuration` format like `/timeout`: "2h", "1d12h"; min 1 minute, max 30 days), `winners` (int 1–20, default 1), `channel` (text channel, optional) |
+| `end`       | `giveaway` (autocomplete over running giveaways) — ends now and draws                                                                                                                                                     |
+| `reroll`    | `giveaway` (autocomplete over ended giveaways), `count` (int 1–20, default 1)                                                                                                                                             |
+| `cancel`    | `giveaway` (autocomplete over running giveaways) — ends without winners                                                                                                                                                   |
+| `block`     | `user` (required), `reason` (optional, max 200)                                                                                                                                                                           |
+| `unblock`   | `user` (required)                                                                                                                                                                                                         |
+| `blocklist` | — ephemeral list of blocked users with who blocked them and why                                                                                                                                                           |
 
 All replies to the host are ephemeral except the giveaway post itself.
 
@@ -102,14 +106,15 @@ All replies to the host are ephemeral except the giveaway post itself.
 "You can't host giveaways."
 
 Per subcommand (the user's decision):
+
 - Manage Server: everything, on every giveaway.
 - Host role: `start`, `block`, `unblock`, `blocklist`; `end`, `reroll`, `cancel` **only on
   giveaways they host** (`hostId`). Autocomplete shows them only their own giveaways; picking
   another host's id anyway gets "You can only manage your own giveaways."
 - (Reading "Jo, aber nur sein eigenes Giveaways" as: host roles may block/unblock too, but only
   touch their own giveaways. Block lists are global, so "own" doesn't apply there.) (My call. Trade-off: every member sees `/giveaway` in the command
-list. The alternative is Manage Server only and per-role overrides in Discord's own
-Server Settings → Integrations, which would drop the host-roles setting.)
+  list. The alternative is Manage Server only and per-role overrides in Discord's own
+  Server Settings → Integrations, which would drop the host-roles setting.)
 
 **Start flow:** resolve channel (option → `giveawayChannelId` → error "Set a giveaway channel in
 /setup or pick one."). Check the bot can post there (`missingPermissions` with `POST_PERMISSIONS`).
@@ -125,15 +130,15 @@ giveaway id. Limited to the current guild.
 
 Goes into the main menu (16 entries today → 23).
 
-| Key | Kind | Default | Meaning |
-|---|---|---|---|
-| `giveawayChannelId` | channel (`POST_PERMISSIONS`) | null | default channel |
-| `giveawayPingRoleId` | pingRole | null | pinged on start |
-| `giveawayHostRoleIds` | roles | [] | may host besides Manage Server |
-| `giveawayBlockedRoleIds` | roles | [] | can't enter |
-| `giveawayBlockWarned` | toggle | off | members with active warnings can't enter |
-| `giveawayWarnDays` | number (days, max 365) | 0 | only warnings of the last X days count; 0 = all active warnings |
-| `giveawayWinnerCooldownDays` | number (days, max 365) | 0 | winners of the last X days can't enter; 0 = off |
+| Key                          | Kind                         | Default | Meaning                                                         |
+| ---------------------------- | ---------------------------- | ------- | --------------------------------------------------------------- |
+| `giveawayChannelId`          | channel (`POST_PERMISSIONS`) | null    | default channel                                                 |
+| `giveawayPingRoleId`         | pingRole                     | null    | pinged on start                                                 |
+| `giveawayHostRoleIds`        | roles                        | []      | may host besides Manage Server                                  |
+| `giveawayBlockedRoleIds`     | roles                        | []      | can't enter                                                     |
+| `giveawayBlockWarned`        | toggle                       | off     | members with active warnings can't enter                        |
+| `giveawayWarnDays`           | number (days, max 365)       | 0       | only warnings of the last X days count; 0 = all active warnings |
+| `giveawayWinnerCooldownDays` | number (days, max 365)       | 0       | winners of the last X days can't enter; 0 = off                 |
 
 "Active warning" = `ModCase` with `action: 'WARN'` and `clearedAt: null` (same rule as
 `/warnings`), optionally limited by `createdAt >= now - giveawayWarnDays`.
@@ -217,6 +222,7 @@ leaves a slightly stale number until the next click or the end edit.
 ### Eligibility (one function, used on enter and on draw)
 
 In order, first failure wins (reason text in brackets):
+
 1. Has a role in `giveawayBlockedRoleIds` ("You have a role that can't enter giveaways.")
 2. In `GiveawayBlock` ("You are blocked from giveaways.")
 3. `giveawayBlockWarned` and an active warning in range ("You have an active warning.")

@@ -97,7 +97,7 @@ export const SETTINGS: Record<SettingKey, Setting> = {
     placeholders: t.gameUpdates.placeholders,
     hint: t.gameUpdates.hint,
   },
-  giveawayChannelId: { kind: 'channel', permissions: POST },
+  giveawayChannelId: { kind: 'channel', permissions: [...POST, 'ReadMessageHistory'] },
   giveawayPingRoleId: { kind: 'pingRole' },
   giveawayHostRoleIds: { kind: 'roles' },
   giveawayBlockedRoleIds: { kind: 'roles' },

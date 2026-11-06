@@ -13,11 +13,10 @@ export default defineComponent({
     const giveaway = Number.isInteger(giveawayId)
       ? await prisma.giveaway.findUnique({ where: { id: giveawayId } })
       : null;
-    if (!giveaway || giveaway.endedAt) {
+    if (!giveaway || giveaway.endedAt || giveaway.endsAt <= new Date()) {
       await interaction.reply({ content: t.giveaways.ended, flags: MessageFlags.Ephemeral });
       return;
     }
-    if (!interaction.inCachedGuild()) return;
     const reason = await checkEligible(
       interaction.member,
       await getConfig(interaction.guildId),

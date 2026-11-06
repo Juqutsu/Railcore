@@ -151,7 +151,11 @@ export default defineCommand({
         await interaction.deferReply({ flags: MessageFlags.Ephemeral });
         const result = await endGiveaway(interaction.client, giveaway.id);
         await interaction.editReply(
-          result === 'ended' ? t.giveaways.endedNow : t.giveaways.alreadyEnded,
+          {
+            ended: t.giveaways.endedNow,
+            cancelled: t.giveaways.cancelledNow,
+            already: t.giveaways.alreadyEnded,
+          }[result],
         );
         return;
       }
@@ -177,9 +181,10 @@ export default defineCommand({
           giveaway.id,
           interaction.options.getInteger('count') ?? 1,
         );
-        await interaction.editReply(
-          winners.length ? t.giveaways.rerolled : t.giveaways.noEligibleLeft,
-        );
+        await interaction.editReply({
+          content: winners.length ? t.giveaways.rerolled(winners) : t.giveaways.noEligibleLeft,
+          allowedMentions: { parse: [] },
+        });
         return;
       }
       case 'block': {
