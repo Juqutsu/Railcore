@@ -5,6 +5,7 @@ export const colors = {
   brand: 0xf76b15,
   success: 0x3e9b4f,
   error: 0xe5484d,
+  muted: 0x4e5058,
 } as const;
 
 function create(color: number, title?: string, description?: string): EmbedBuilder {
@@ -19,6 +20,7 @@ export const embeds = {
   info: (title?: string, description?: string) => create(colors.brand, title, description),
   success: (title?: string, description?: string) => create(colors.success, title, description),
   error: (title?: string, description?: string) => create(colors.error, title, description),
+  muted: (title?: string, description?: string) => create(colors.muted, title, description),
 };
 
 /** Shortens text to fit an embed limit, marking the cut with "…". */

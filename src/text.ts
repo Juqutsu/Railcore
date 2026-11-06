@@ -39,6 +39,8 @@ export const t = {
     purge: 'Bulk delete recent messages in this channel',
     stats: "Show a player's XP, points and driving stats from the game",
     leaderboard: 'Show the top 100 drivers of Falkenberg Railways',
+    giveaway: 'Host and manage giveaways',
+    giveawayStart: 'Start a giveaway',
   },
 
   /** Right-click menu entries (Apps). Max 32 characters; re-register commands after changing. */
@@ -63,6 +65,36 @@ export const t = {
     reportsPlayer: 'Roblox username of the player',
     statsUser: 'Whose stats to show (default: you)',
     leaderboardBy: 'What to rank by (default: XP)',
+    giveawayPrize: 'What can be won',
+    giveawayDuration: 'How long it runs, e.g. 30m, 2h or 1d (1 minute to 30 days)',
+    giveawayWinners: 'How many winners (default: 1)',
+    giveawayChannel: 'Where to post it (default: the giveaway channel from /setup)',
+  },
+
+  giveaways: {
+    cantHost: "You can't host giveaways.",
+    ended: 'This giveaway has ended.',
+    noChannel: 'Set a giveaway channel in /setup or pick one.',
+    badDuration: 'Use a duration between 1 minute and 30 days, like `30m`, `2h` or `1d12h`.',
+    cantPost: (channel: string, missing: string[]) =>
+      `I can't post in ${channel}. Missing: ${missing.join(', ')}.`,
+    started: (url: string) => `Giveaway started: ${url}`,
+    enterPrompt: 'Click **Enter** below to join!',
+    ends: 'Ends',
+    winners: 'Winners',
+    winnersLabel: (n: number) => (n === 1 ? 'Winner' : 'Winners'),
+    entries: 'Entries',
+    hostedBy: 'Hosted by',
+    noValidEntries: 'No valid entries.',
+    enter: (count: number) => `🎉 Enter · ${count}`,
+    endedLabel: '🎉 Ended',
+    cancelledLabel: '🎉 Cancelled',
+    endedSuffix: 'Ended',
+    cancelledSuffix: 'Cancelled',
+    entered: (prize: string) => `You're in! Good luck in the **${prize}** giveaway.`,
+    alreadyEntered: "You're already entered.",
+    leave: 'Leave giveaway',
+    left: 'You left the giveaway.',
   },
 
   time: {
