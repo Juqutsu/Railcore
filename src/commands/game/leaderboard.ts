@@ -16,12 +16,22 @@ export default defineCommand({
           { name: t.leaderboard.by.xp, value: 'xp' },
           { name: t.leaderboard.by.km, value: 'km' },
         ),
+    )
+    .addStringOption((option) =>
+      option
+        .setName('week')
+        .setDescription(t.options.leaderboardWeek)
+        .addChoices(
+          { name: t.leaderboard.week.this, value: 'this' },
+          { name: t.leaderboard.week.last, value: 'last' },
+        ),
     ),
 
   async execute(interaction) {
     assertGameDataReady(false);
     const board = interaction.options.getString('by') === 'km' ? 'km' : 'xp';
+    const week = interaction.options.getString('week') === 'last' ? 'last' : 'this';
     await interaction.deferReply();
-    await interaction.editReply(await leaderboardReply(board, 0, interaction.user.id));
+    await interaction.editReply(await leaderboardReply(board, week, 0, interaction.user.id));
   },
 });
