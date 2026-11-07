@@ -13,15 +13,20 @@ import { embeds } from '../utils/embeds.js';
 import { UserError } from '../utils/errors.js';
 import { logger } from '../utils/logger.js';
 import { parseProgress } from '../utils/progress.js';
+import { weekKey, weekStart } from '../utils/week.js';
 import { rankOf } from '../utils/xpTiers.js';
 import { activeTiers, applyXp, tiersOf } from './xpRoles.js';
 
 // Falkenberg Railways itself; the API key is scoped to this universe.
 const UNIVERSE_ID = '10123051468';
 const PROGRESS_STORE = 'FBR_Progress_v1';
-/** The game's OrderedDataStores; same `u_<userId>` keys, whole-number values. */
-const BOARDS = { xp: 'FBR_Leaderboard_XP_v1', km: 'FBR_Leaderboard_Km_v1' } as const;
+/**
+ * The game's weekly OrderedDataStores, one per ISO week: prefix + `2026_W45`. Same `u_<userId>`
+ * keys; whole-number values earned in that week only. Players who earned nothing aren't listed.
+ */
+const BOARDS = { xp: 'FBR_Leaderboard_XP_', km: 'FBR_Leaderboard_Km_' } as const;
 export type Board = keyof typeof BOARDS;
+export type Week = 'this' | 'last';
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object';
@@ -196,14 +201,17 @@ async function displayNames(robloxIds: string[]): Promise<Map<string, string>> {
 const TOP = 100;
 const PAGE_SIZE = 10;
 
-/** Key is a Board. Its top 100 real players, best first, with their display names. */
-const topOf = cached(60_000, async (board) => {
+/**
+ * Key is a store name. Its top 100 real players, best first, with their display names. A week
+ * nobody has played yet has no store; its 404 gives an empty board.
+ */
+const topOf = cached(60_000, async (store) => {
   const top: { robloxId: string; value: number }[] = [];
   let pageToken = '';
   // A second page only when Studio test profiles (negative IDs) were skipped on the first.
   for (let request = 0; request < 2 && top.length < TOP; request++) {
     const body = await getJson(
-      `https://apis.roblox.com/cloud/v2/universes/${UNIVERSE_ID}/ordered-data-stores/${BOARDS[board as Board]}/scopes/global/entries?maxPageSize=${TOP}&orderBy=value%20desc${pageToken && `&pageToken=${encodeURIComponent(pageToken)}`}`,
+      `https://apis.roblox.com/cloud/v2/universes/${UNIVERSE_ID}/ordered-data-stores/${store}/scopes/global/entries?maxPageSize=${TOP}&orderBy=value%20desc${pageToken && `&pageToken=${encodeURIComponent(pageToken)}`}`,
       { headers: { 'x-api-key': env.ROBLOX_API_KEY ?? '' } },
     );
     if (!isRecord(body)) break;
@@ -351,19 +359,24 @@ export async function statsReply(
 }
 
 /**
- * One page of a board. The buttons carry `ownerId`, board and page in their custom IDs, so they
- * keep working after a restart; see interactions/buttons/lb-page.ts.
+ * One page of a weekly board. The buttons carry `ownerId`, board, week and page in their custom
+ * IDs, so they keep working after a restart; see interactions/buttons/lb-page.ts.
  */
 export async function leaderboardReply(
   board: Board,
+  week: Week,
   page: number,
   ownerId: string,
 ): Promise<BaseMessageOptions> {
+  const start = weekStart(Date.now());
+  // "Last week" is the week of the millisecond before this one started.
+  const key = weekKey(week === 'this' ? start : start - 1);
+  const store = BOARDS[board] + key;
   let top;
   try {
-    top = (await topOf(board)) ?? [];
+    top = (await topOf(store)) ?? [];
   } catch (err) {
-    throw lookupError(err, { board });
+    throw lookupError(err, { store });
   }
   const pages = Math.max(1, Math.ceil(top.length / PAGE_SIZE));
   const current = Math.min(Math.max(0, Math.trunc(page) || 0), pages - 1);
@@ -377,35 +390,44 @@ export async function leaderboardReply(
       value,
     );
   });
+  const weekNumber = Number(key.slice(-2));
+  const header =
+    week === 'this'
+      ? t.leaderboard.resets(weekNumber, Math.floor((start + 7 * 86_400_000) / 1000))
+      : t.leaderboard.final(weekNumber);
   const embed = embeds.info(
-    t.leaderboard.title(t.leaderboard.by[board]),
-    lines.join('\n') || t.leaderboard.empty,
+    t.leaderboard.title(t.leaderboard.week[week], t.leaderboard.by[board]),
+    `${header}\n\n${lines.join('\n') || t.leaderboard.empty[week]}`,
   );
 
   // Custom IDs must be unique within a message, hence the trailing tags on the extra buttons.
-  const id = (target: Board, targetPage: number, tag = '') =>
-    `lb:page:${ownerId}:${target}:${targetPage}${tag && `:${tag}`}`;
+  const id = (target: Board, targetWeek: Week, targetPage: number, tag = '') =>
+    `lb:page:${ownerId}:${target}:${targetWeek}:${targetPage}${tag && `:${tag}`}`;
   const button = (customId: string, label: string, style = ButtonStyle.Secondary) =>
     new ButtonBuilder().setCustomId(customId).setLabel(label).setStyle(style);
   const rows = [];
   if (pages > 1) {
     rows.push(
       new ActionRowBuilder<ButtonBuilder>().addComponents(
-        button(id(board, current - 1), t.leaderboard.prev).setDisabled(current === 0),
-        button(id(board, current, 'now'), t.leaderboard.page(current + 1, pages)).setDisabled(true),
-        button(id(board, current + 1), t.leaderboard.next).setDisabled(current === pages - 1),
+        button(id(board, week, current - 1), t.leaderboard.prev).setDisabled(current === 0),
+        button(id(board, week, current, 'now'), t.leaderboard.page(current + 1, pages)).setDisabled(
+          true,
+        ),
+        button(id(board, week, current + 1), t.leaderboard.next).setDisabled(current === pages - 1),
       ),
     );
   }
+  const otherWeek: Week = week === 'this' ? 'last' : 'this';
   rows.push(
     new ActionRowBuilder<ButtonBuilder>().addComponents(
-      (Object.keys(BOARDS) as Board[]).map((target) =>
+      ...(Object.keys(BOARDS) as Board[]).map((target) =>
         button(
-          id(target, 0, 'board'),
+          id(target, week, 0, 'board'),
           t.leaderboard.by[target],
           target === board ? ButtonStyle.Primary : ButtonStyle.Secondary,
         ).setDisabled(target === board),
       ),
+      button(id(board, otherWeek, 0, 'week'), t.leaderboard.week[otherWeek]),
     ),
   );
   return { embeds: [embed], components: rows };

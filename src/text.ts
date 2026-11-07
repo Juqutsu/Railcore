@@ -38,7 +38,7 @@ export const t = {
     unban: 'Unban a user',
     purge: 'Bulk delete recent messages in this channel',
     stats: "Show a player's XP, points and driving stats from the game",
-    leaderboard: 'Show the top 100 drivers of Falkenberg Railways',
+    leaderboard: "Show this week's top 100 drivers of Falkenberg Railways",
     giveaway: 'Host and manage giveaways',
     giveawayStart: 'Start a giveaway',
     giveawayEnd: 'End a giveaway now and draw the winners',
@@ -71,6 +71,7 @@ export const t = {
     reportsPlayer: 'Roblox username of the player',
     statsUser: 'Whose stats to show (default: you)',
     leaderboardBy: 'What to rank by (default: XP)',
+    leaderboardWeek: 'Which week (default: this week)',
     giveawayPrize: 'What can be won',
     giveawayDuration: 'How long it runs, e.g. 30m, 2h or 1d (1 minute to 30 days)',
     giveawayWinners: 'How many winners (default: 1)',
@@ -526,12 +527,18 @@ export const t = {
 
   leaderboard: {
     by: { xp: 'XP', km: 'Distance' },
-    title: (by: string) => `🏆 Top drivers · ${by}`,
+    week: { this: 'This week', last: 'Last week' },
+    title: (week: string, by: string) => `🏆 Weekly top drivers · ${week} · ${by}`,
+    resets: (week: number, unix: number) => `Week ${week} · resets <t:${unix}:R>`,
+    final: (week: number) => `Week ${week} · final standings`,
     // "#4" rather than "4." so Discord doesn't turn the lines into a numbered list.
     place: (n: number) => ['🥇', '🥈', '🥉'][n - 1] ?? `\`#${n}\``,
     line: (place: string, name: string, value: string) => `${place} ${name} · **${value}**`,
     xp: (xp: string) => `${xp} XP`,
-    empty: 'Nobody is on this board yet. Time to drive some trains!',
+    empty: {
+      this: 'No drivers yet this week. Time to drive some trains!',
+      last: 'Nobody made the board last week.',
+    },
     prev: '◀ Prev',
     next: 'Next ▶',
     page: (page: number, pages: number) => `Page ${page}/${pages}`,
